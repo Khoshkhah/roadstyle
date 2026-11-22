@@ -39,7 +39,8 @@ vehicles:   # the vehicles of a traffic microsimulation run (docs/design/vehicle
     car: {light: "#e63946", dark: "#ff6b6b"}
     bus: {light: "#1d4ed8", dark: "#60a5fa"}
     truck: {light: "#b45309", dark: "#fbbf24"}
-    two_wheel: {light: "#7c3aed", dark: "#c4b5fd"}
+    motorcycle: {light: "#7c3aed", dark: "#c4b5fd"}
+    bicycle: {light: "#15803d", dark: "#4ade80"}
     rail: {light: "#0f766e", dark: "#5eead4"}
     special: {light: "#be185d", dark: "#f9a8d4"}
   lanes:                      # the lanes of the run under the vehicles (SUMO's lanes of net.xml): the surface and the marking between two lanes

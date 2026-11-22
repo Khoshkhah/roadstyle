@@ -11,7 +11,8 @@
 // THE LANES: the junction areas and the lanes of the run's net.xml (VehicleScene.lanes, the surface that the vehicles drive on), under the
 // vehicles: the junctions' polygons in the lane colour, then each lane at its width in metres, a marking line at the full width and the
 // surface on it less the marking. A lane inside a junction has no marking.
-// P1: flat ground (z 0), boxes, no camera.
+// THE SHAPES: each kind of the look has its own mesh (_VH_SHAPES) and colour; the instances of one kind are drawn together.
+// P1: flat ground (z 0), no camera.
 import {map, O, RS_PREFIX, _emit} from "./core.js";
 
 const _VH_STRIDE = 16;                 // the numbers of one vehicle in VehicleScene.frame
@@ -25,19 +26,71 @@ let _vhLanes = null, _vhLanesIn = null; // the lanes' GeoJSON (null: the page sh
 let _vhScene = null, _vhOrigin = null, _vhColours = null, _vhReport = null, _vhIds = null, _vhClasses = [], _vhGiven = null;
 let _vhT = 0, _vhSpeed = 1, _vhPlaying = false, _vhWall = null, _vhSentAt = 0, _vhDirty = true;
 let _vhGl = null, _vhProg = null, _vhVao = null, _vhInstBuf = null, _vhN = 0, _vhLoc = {};
+let _vhKindOf = [], _vhGroups = [];    // the shape of each class number; the kinds of this frame: [shape, first instance, count]
 
-// a unit box: x forward (-0.5..0.5 of the length), y right (-0.5..0.5 of the width), z up (0..1 of the height); 6 faces, outward normals
-function _vhBox(){
-  const F = [[[1,0,0],[[.5,-.5,0],[.5,.5,0],[.5,.5,1],[.5,-.5,1]]], [[-1,0,0],[[-.5,.5,0],[-.5,-.5,0],[-.5,-.5,1],[-.5,.5,1]]],
-             [[0,1,0],[[.5,.5,0],[-.5,.5,0],[-.5,.5,1],[.5,.5,1]]], [[0,-1,0],[[-.5,-.5,0],[.5,-.5,0],[.5,-.5,1],[-.5,-.5,1]]],
-             [[0,0,1],[[-.5,-.5,1],[.5,-.5,1],[.5,.5,1],[-.5,.5,1]]], [[0,0,-1],[[-.5,.5,0],[.5,.5,0],[.5,-.5,0],[-.5,-.5,0]]]];
-  const v = [];
-  for(const [n, q] of F) for(const k of [0, 1, 2, 0, 2, 3]) v.push(...q[k], ...n);
-  return new Float32Array(v);
+// THE SHAPES: one mesh for each kind of the look (vehicles.classes.<class>.kind), in the unit space of a vehicle: x forward (-0.5..0.5 of
+// the length), y right (-0.5..0.5 of the width), z up (0..1 of the height). Each vertex: position, normal, tone (the colour's factor:
+// 1 the body, below 1 the glass, above 1 the lights at the front, so the heading shows). A kind with no mesh of its own takes the car's.
+// a block: x0..x1, y0..y1, z0..z1, tone; `nose` (0..1) slopes the top of the front face back by that part of the length (a windscreen)
+function _vhBlock(v, [x0, x1], [y0, y1], [z0, z1], tone, nose = 0){
+  const xt = x1 - nose * (x1 - x0);
+  const P = {a: [x0, y0, z0], b: [x1, y0, z0], c: [x1, y1, z0], d: [x0, y1, z0], e: [x0, y0, z1], f: [xt, y0, z1], g: [xt, y1, z1], h: [x0, y1, z1]};
+  const face = (q, t = tone) => {
+    const [p0, p1, p2] = q.map(k => P[k]);
+    const u = p1.map((x, i) => x - p0[i]), w = p2.map((x, i) => x - p0[i]);
+    let n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+    const l = Math.hypot(...n) || 1; n = n.map(x => x / l);
+    for(const k of [0, 1, 2, 0, 2, 3]) v.push(...P[q[k]], ...n, t);
+  };
+  face(["b", "c", "g", "f"], nose ? tone * 0.55 : tone);   // the front (a sloped front is glass)
+  face(["d", "a", "e", "h"]); face(["c", "d", "h", "g"]); face(["a", "b", "f", "e"]);
+  face(["e", "f", "g", "h"]); face(["d", "c", "b", "a"]);
 }
+const _VH_GLASS = 0.5, _VH_LIGHT = 1.35;
+const _VH_SHAPES = {
+  car(v){
+    _vhBlock(v, [-0.5, 0.5], [-0.5, 0.5], [0.12, 0.55], 1);              // the body
+    _vhBlock(v, [-0.32, 0.22], [-0.44, 0.44], [0.55, 1], _VH_GLASS, 0.3);  // the cabin, its windscreen to the front
+    _vhBlock(v, [0.47, 0.5], [-0.42, -0.22], [0.3, 0.45], _VH_LIGHT); _vhBlock(v, [0.47, 0.5], [0.22, 0.42], [0.3, 0.45], _VH_LIGHT);
+  },
+  bus(v){
+    _vhBlock(v, [-0.5, 0.5], [-0.5, 0.5], [0.08, 0.62], 1);
+    _vhBlock(v, [-0.48, 0.5], [-0.5, 0.5], [0.62, 0.9], _VH_GLASS);        // the band of windows
+    _vhBlock(v, [-0.5, 0.5], [-0.5, 0.5], [0.9, 1], 1);
+    _vhBlock(v, [0.49, 0.5], [-0.45, 0.45], [0.2, 0.3], _VH_LIGHT);
+  },
+  truck(v){
+    _vhBlock(v, [0.22, 0.5], [-0.48, 0.48], [0.1, 0.55], 1);              // the cab
+    _vhBlock(v, [0.22, 0.46], [-0.46, 0.46], [0.55, 0.85], _VH_GLASS, 0.2);
+    _vhBlock(v, [-0.5, 0.19], [-0.5, 0.5], [0.12, 1], 0.85);              // the box
+    _vhBlock(v, [0.48, 0.5], [-0.42, 0.42], [0.18, 0.28], _VH_LIGHT);
+  },
+  motorcycle(v){
+    _vhBlock(v, [-0.5, 0.5], [-0.18, 0.18], [0.12, 0.45], 1);             // the frame
+    _vhBlock(v, [-0.2, 0.12], [-0.4, 0.4], [0.45, 1], _VH_GLASS);         // the rider
+    _vhBlock(v, [0.44, 0.5], [-0.12, 0.12], [0.35, 0.5], _VH_LIGHT);
+  },
+  bicycle(v){
+    _vhBlock(v, [-0.5, 0.5], [-0.08, 0.08], [0.1, 0.4], 1);
+    _vhBlock(v, [-0.25, 0.05], [-0.45, 0.45], [0.4, 1], _VH_GLASS);
+  },
+  rail(v){
+    _vhBlock(v, [-0.5, 0.5], [-0.5, 0.5], [0.05, 0.6], 1);
+    _vhBlock(v, [-0.5, 0.5], [-0.5, 0.5], [0.6, 0.88], _VH_GLASS, 0.03);
+    _vhBlock(v, [-0.5, 0.485], [-0.5, 0.5], [0.88, 1], 1);
+  },
+};
+
+// every kind's mesh in one buffer: the vertices (7 numbers each) and, for each kind, its first vertex and its vertex count
+function _vhMeshes(){
+  const v = [], at = {};
+  for(const [k, make] of Object.entries(_VH_SHAPES)){ const first = v.length / 7; make(v); at[k] = [first, v.length / 7 - first]; }
+  return {data: new Float32Array(v), at};
+}
+const _VH_MESH = _vhMeshes();
 
 const _VH_VS = `#version 300 es
-in vec3 a_pos; in vec3 a_nrm;
+in vec3 a_pos; in vec3 a_nrm; in float a_tone;
 in vec4 i_pos;                  // x, y, z (origin metres; y south), heading (radians, 0 = north, clockwise)
 in vec4 i_size;                 // length, width, height (m), class
 uniform mat4 u_m; uniform vec4 u_col[${_VH_MAX_CLASSES}];
@@ -50,7 +103,7 @@ void main(){
   vec3 n = normalize(vec3(f * a_nrm.x + r * a_nrm.y, a_nrm.z));
   float shade = 0.55 + 0.45 * max(dot(n, normalize(vec3(-0.4, -0.5, 0.75))), 0.0);
   vec4 c = u_col[int(i_size.w) % ${_VH_MAX_CLASSES}];
-  v_col = vec4(c.rgb * shade * c.a, c.a);
+  v_col = vec4(min(c.rgb * shade * a_tone, vec3(1.0)) * c.a, c.a);
 }`;
 const _VH_FS = `#version 300 es
 precision mediump float; in vec4 v_col; out vec4 o_col; void main(){ o_col = v_col; }`;
@@ -81,18 +134,16 @@ const _vhLayer = {
     gl.attachShader(_vhProg, _vhShader(gl, gl.FRAGMENT_SHADER, _VH_FS));
     gl.linkProgram(_vhProg);
     if(!gl.getProgramParameter(_vhProg, gl.LINK_STATUS)) throw new Error("rs.vehicles: program: " + gl.getProgramInfoLog(_vhProg));
-    for(const k of ["a_pos", "a_nrm", "i_pos", "i_size"]) _vhLoc[k] = gl.getAttribLocation(_vhProg, k);
+    for(const k of ["a_pos", "a_nrm", "a_tone", "i_pos", "i_size"]) _vhLoc[k] = gl.getAttribLocation(_vhProg, k);
     _vhLoc.u_m = gl.getUniformLocation(_vhProg, "u_m"); _vhLoc.u_col = gl.getUniformLocation(_vhProg, "u_col");
     _vhVao = gl.createVertexArray(); gl.bindVertexArray(_vhVao);
-    const box = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, box); gl.bufferData(gl.ARRAY_BUFFER, _vhBox(), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(_vhLoc.a_pos); gl.vertexAttribPointer(_vhLoc.a_pos, 3, gl.FLOAT, false, 24, 0);
-    gl.enableVertexAttribArray(_vhLoc.a_nrm); gl.vertexAttribPointer(_vhLoc.a_nrm, 3, gl.FLOAT, false, 24, 12);
-    _vhInstBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, _vhInstBuf);
-    const st = _VH_STRIDE * 4;
-    gl.enableVertexAttribArray(_vhLoc.i_pos); gl.vertexAttribPointer(_vhLoc.i_pos, 4, gl.FLOAT, false, st, 0);   // x, y, z, heading
-    gl.vertexAttribDivisor(_vhLoc.i_pos, 1);
-    gl.enableVertexAttribArray(_vhLoc.i_size); gl.vertexAttribPointer(_vhLoc.i_size, 4, gl.FLOAT, false, st, 24); // length, width, height, class
-    gl.vertexAttribDivisor(_vhLoc.i_size, 1);
+    const mesh = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, mesh); gl.bufferData(gl.ARRAY_BUFFER, _VH_MESH.data, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(_vhLoc.a_pos); gl.vertexAttribPointer(_vhLoc.a_pos, 3, gl.FLOAT, false, 28, 0);
+    gl.enableVertexAttribArray(_vhLoc.a_nrm); gl.vertexAttribPointer(_vhLoc.a_nrm, 3, gl.FLOAT, false, 28, 12);
+    gl.enableVertexAttribArray(_vhLoc.a_tone); gl.vertexAttribPointer(_vhLoc.a_tone, 1, gl.FLOAT, false, 28, 24);
+    _vhInstBuf = gl.createBuffer();
+    gl.enableVertexAttribArray(_vhLoc.i_pos); gl.vertexAttribDivisor(_vhLoc.i_pos, 1);
+    gl.enableVertexAttribArray(_vhLoc.i_size); gl.vertexAttribDivisor(_vhLoc.i_size, 1);
     gl.bindVertexArray(null);
   },
   render(gl, args){
@@ -106,7 +157,7 @@ const _vhLayer = {
     if(_vhDirty){
       const inst = _vhScene.frame(_vhT);
       _vhN = inst.length / _VH_STRIDE;
-      gl.bindBuffer(gl.ARRAY_BUFFER, _vhInstBuf); gl.bufferData(gl.ARRAY_BUFFER, inst, gl.DYNAMIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, _vhInstBuf); gl.bufferData(gl.ARRAY_BUFFER, _vhByShape(inst), gl.DYNAMIC_DRAW);
       _vhDirty = false;
       if(now - _vhSentAt > 250){ _vhSentAt = now; _emit("rs:vehicletime", {t: _vhT}); }
     }
@@ -119,13 +170,36 @@ const _vhLayer = {
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
       gl.disable(gl.CULL_FACE); gl.disable(gl.STENCIL_TEST);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      gl.bindVertexArray(_vhVao);
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, _vhN);
+      gl.bindVertexArray(_vhVao); gl.bindBuffer(gl.ARRAY_BUFFER, _vhInstBuf);
+      const st = _VH_STRIDE * 4;
+      for(const [shape, first, n] of _vhGroups){
+        gl.vertexAttribPointer(_vhLoc.i_pos, 4, gl.FLOAT, false, st, first * st);        // x, y, z, heading
+        gl.vertexAttribPointer(_vhLoc.i_size, 4, gl.FLOAT, false, st, first * st + 24);  // length, width, height, class
+        const [v0, nv] = _VH_MESH.at[shape];
+        gl.drawArraysInstanced(gl.TRIANGLES, v0, nv, n);
+      }
       gl.bindVertexArray(null);
     }
     if(_vhPlaying) map.triggerRepaint();
   }
 };
+
+// the instances of a frame ordered by shape, and _vhGroups: [shape, first instance, count] for each shape of the frame
+function _vhByShape(inst){
+  const n = inst.length / _VH_STRIDE, groups = new Map();
+  for(let i = 0; i < n; i++){
+    const k = _vhKindOf[inst[i * _VH_STRIDE + 9]] || "car";
+    if(!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(i);
+  }
+  const out = new Float32Array(inst.length);
+  let at = 0; _vhGroups = [];
+  for(const [k, rows] of groups){
+    _vhGroups.push([k, at, rows.length]);
+    for(const i of rows) out.set(inst.subarray(i * _VH_STRIDE, (i + 1) * _VH_STRIDE), (at++) * _VH_STRIDE);
+  }
+  return out;
+}
 
 // the layer on top: after the 3D switch, a base map change or a new style added layers above it
 function _vhOnTop(){
@@ -233,6 +307,7 @@ async function _vhLoad(o){
   const [fcd, net, routes] = await Promise.all([_vhBytes(o.fcd), _vhText(o.net), _vhText(o.routes)]);
   const scene = new mod.VehicleScene(fcd, net, routes, JSON.stringify(options));
   _vhClasses = scene.classes(); _vhGiven = o.colours || null;
+  _vhKindOf = _vhClasses.map(c => { const k = O.vehicle_look && O.vehicle_look.classes[c] && O.vehicle_look.classes[c].kind; return k in _VH_SHAPES ? k : "car"; });
   _vhPaint();
   _vhScene = scene; _vhOrigin = scene.origin(); _vhIds = scene.ids();
   _vhReport = JSON.parse(scene.report());

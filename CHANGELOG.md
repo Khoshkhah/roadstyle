@@ -8,6 +8,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 
+- **A shape and a colour for each kind of vehicle.** A SUMO run's vehicles are no longer plain boxes: a car has a body and a cabin, a bus a band of windows, a truck a cab and a box, a motorcycle and a bicycle are thin with a rider, a train is long. Glass is darker, the lights at the front are lighter, so the heading shows. Each kind has its own colour in both themes. The kind `two_wheel` of the palettes and the profile is now two kinds, `motorcycle` (motorcycle, moped, scooter) and `bicycle`; a look of your own with `two_wheel` must change.
+
 - **The lanes of a SUMO run under its vehicles.** A page with `vehicles=` draws the junction areas and each lane of the run's `net.xml` (each lane at its width in metres, with a marking between two lanes), so each vehicle is in its own lane, also inside a junction. All of it comes from SUMO, none from duckOSM. `"lanes": False` leaves them out. New look keys: the palettes' `vehicles.lanes` (`fill`, `marking`, light and dark) and the profile's `vehicles.lanes.marking_m`.
 
 - **A nightly wheel** (`.github/workflows/nightly.yml`): each merge to main that changes the package puts a Linux x86_64 wheel, with the vehicles module in it, in the GitHub pre-release `nightly`, in place of the old one. Its version is `<version>+nightly.<run>`. Nothing goes to PyPI. How to install it: `docs/get-started.md`.
