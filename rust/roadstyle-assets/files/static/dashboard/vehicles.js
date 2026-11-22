@@ -170,9 +170,15 @@ function _vhPaint(){
 }
 
 async function _vhBytes(x){ return typeof x === "string" ? new Uint8Array(await (await fetch(x)).arrayBuffer()) : x; }
+// the bytes of a WebAssembly file; a gzip file (roadstyle's own module, roadstyle_wasm_bg.wasm.gz) is decompressed
+async function _vhWasm(x){
+  const b = await _vhBytes(x);
+  return b[0] === 0x1f && b[1] === 0x8b ? new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer()) : b;
+}
 async function _vhText(x){ return x == null ? undefined : (/^\s*</.test(x) ? x : await (await fetch(x)).text()); }
 
-// load({wasm, fcd, net, routes, options?, colours?}): `wasm` the URL of roadstyle_wasm.js built with the feature "vehicles"; `fcd` the
+// load({wasm, wasm_bin?, fcd, net, routes, options?, colours?}): `wasm` the URL of roadstyle_wasm.js built with the feature "vehicles";
+// `wasm_bin` (optional) the bytes or the URL of its roadstyle_wasm_bg.wasm, or of that file in gzip (needed when `wasm` is a data: URL, which has no folder); `fcd` the
 // bytes or the URL of SUMO's FCD Parquet file; `net` the text or the URL of the run's net.xml; `routes` (optional) the text or URL of
 // a file with the <vType> elements. `options` (every key of _VH_KEYS) and `colours` ({class: "#rrggbb"}) default to the look's vehicles
 // section. Gives the run's report and sends rs:vehicleload. A page with the option `vehicles` calls it at start (index.js).
@@ -183,7 +189,7 @@ async function _vhLoad(o){
   const options = o.options || _vhOptions(O.vehicle_look);
   for(const k of _VH_KEYS) if(options[k] == null) throw new Error(`rs.vehicles.load: options.${k} is missing`);
   const mod = await import(new URL(o.wasm, document.baseURI).href);
-  await mod.default();
+  await mod.default(o.wasm_bin == null ? undefined : {module_or_path: await _vhWasm(o.wasm_bin)});
   const [fcd, net, routes] = await Promise.all([_vhBytes(o.fcd), _vhText(o.net), _vhText(o.routes)]);
   const scene = new mod.VehicleScene(fcd, net, routes, JSON.stringify(options));
   _vhClasses = scene.classes(); _vhGiven = o.colours || null;

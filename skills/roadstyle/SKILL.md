@@ -186,7 +186,7 @@ rs.snapshot(m, "map.png", zoom=15)        # headless screenshot; then view map.p
 
 ## JavaScript API (in the saved page)
 
-- Vehicles of a SUMO run: `vehicles={"wasm": ..., "fcd": ..., "net": ...}` (URLs: `roadstyle_wasm.js` built with `--features vehicles`, the FCD Parquet with `--fcd-output.geo true`, the run's `net.xml`) loads them at start; `rs.vehicles.play()`, `pause()`, `seek(t)`, `speed(x)`, `report()`. Colours and sizes are the look's `vehicles` section. Example: `examples/vehicles/`.
+- Vehicles of a SUMO run: `vehicles={"fcd": path, "net": path}` (the FCD Parquet with `--fcd-output.geo true`, the run's `net.xml`; local paths go into the page, URLs stay URLs) loads them at start, with roadstyle's own vehicles module and a play bar (give `"wasm": url` for your own build, and then no play bar); `rs.vehicles.play()`, `pause()`, `seek(t)`, `speed(x)`, `report()`. Colours and sizes are the look's `vehicles` section. Example: `examples/vehicles/`.
 
 | call | does |
 |---|---|

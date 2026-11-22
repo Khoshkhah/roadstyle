@@ -43,3 +43,6 @@ src/roadstyle/_rust*.pyd
 # the build folder that the worktrees share (docs/rust/build.md, "One shared build folder")
 /.shared-target/
 
+
+# roadstyle's vehicles module, a build output (rust/roadstyle-wasm/build_vehicles.sh)
+src/roadstyle/static/vehicles/pkg/
