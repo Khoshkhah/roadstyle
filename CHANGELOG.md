@@ -8,6 +8,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 
+- **A nightly wheel** (`.github/workflows/nightly.yml`): each merge to main that changes the package puts a Linux x86_64 wheel, with the vehicles module in it, in the GitHub pre-release `nightly`, in place of the old one. Its version is `<version>+nightly.<run>`. Nothing goes to PyPI. How to install it: `docs/get-started.md`.
+
+### Added
+
 - **A SUMO run on a page from Python, with no build of your own** (`vehicles={"fcd": path, "net": path}`). A local file goes into the page: the FCD Parquet (`--fcd-output.geo true`) as a `data:` URL, `net.xml` and `routes` as their text. A URL stays a URL. With no `wasm`, the page gets roadstyle's vehicles module (in the package, about 5 MB in the page) and a play bar (play, pause, seek, speed). The release workflow builds the module (`rust/roadstyle-wasm/build_vehicles.sh`); in a source checkout, run that script. `rs.vehicles.load` takes `wasm_bin`, the bytes or the URL of the module's `.wasm` file (also in gzip). Test: `tests/test_vehicles.py` (the Monaco run of `roadstyle-sim`).
 
 ## [0.30.0] - 2026-11-20
