@@ -1,10 +1,14 @@
 """Top-level ``render_edges`` — normalise input, filter, then render with the chosen backend."""
 from __future__ import annotations
 
+import base64
 import json
+import os
 import warnings
 from collections.abc import Mapping
+from pathlib import Path
 
+from . import _assets
 from .edges import as_edges
 
 
@@ -39,6 +43,44 @@ def _named_basemaps(kwargs, api_key):
         out["basemap"] = named(out["basemap"])
     if out.get("basemaps") is not None:
         out["basemaps"] = [named(b) for b in out["basemaps"]]
+    return out
+
+
+#: roadstyle's vehicles module: roadstyle-wasm built with the feature "vehicles" (rust/roadstyle-wasm/build_vehicles.sh), in the package
+VEHICLES_PKG = Path(__file__).parent / "static" / "vehicles" / "pkg"
+
+
+def _local(v):
+    """The file of ``v`` when ``v`` is a local file (a ``Path``, or a text that names a file), else None (``v`` is a URL)."""
+    if isinstance(v, os.PathLike):
+        if not Path(v).is_file():
+            raise FileNotFoundError(f"vehicles: no file {v}")
+        return Path(v)
+    return Path(v) if isinstance(v, str) and "://" not in v and not v.startswith("data:") and Path(v).is_file() else None
+
+
+def _vehicles(kwargs):
+    """The page option ``vehicles``: a local file goes into the page (the FCD Parquet as a data: URL, ``net`` and ``routes`` as their
+    XML text), a URL stays a URL. With no ``wasm``, the page gets roadstyle's vehicles module (``VEHICLES_PKG``) inside it, and the
+    play bar (static/vehicles/play_bar.js) before the page's own script."""
+    v = dict(kwargs["vehicles"])
+    if v.get("fcd") is None or v.get("net") is None:
+        raise ValueError("vehicles: give 'fcd' (SUMO's FCD Parquet, --fcd-output.geo true) and 'net' (the run's net.xml)")
+    b64 = lambda data, kind: f"data:{kind};base64," + base64.b64encode(data).decode()       # noqa: E731
+    if isinstance(v["fcd"], bytes) or _local(v["fcd"]):
+        v["fcd"] = b64(v["fcd"] if isinstance(v["fcd"], bytes) else _local(v["fcd"]).read_bytes(), "application/vnd.apache.parquet")
+    for k in ("net", "routes"):
+        if v.get(k) is not None and _local(v[k]):
+            v[k] = _local(v[k]).read_text(encoding="utf-8-sig")
+    out = dict(kwargs)
+    if v.get("wasm") is None:
+        js, wasm = VEHICLES_PKG / "roadstyle_wasm.js", VEHICLES_PKG / "roadstyle_wasm_bg.wasm.gz"
+        if not (js.is_file() and wasm.is_file()):
+            raise FileNotFoundError(f"vehicles: roadstyle's vehicles module is not in {VEHICLES_PKG}. In a source checkout, build it: "
+                                    "rust/roadstyle-wasm/build_vehicles.sh. Or give 'wasm', the URL of your own build")
+        v["wasm"], v["wasm_bin"] = b64(js.read_bytes(), "text/javascript"), b64(wasm.read_bytes(), "application/gzip")
+        out["page_script"] = _assets.text("static/vehicles/play_bar.js") + "\n" + (out.get("page_script") or "")
+    out["vehicles"] = v
     return out
 
 
@@ -162,6 +204,8 @@ def render_edges(
         if kwargs.get("bridge_profile") is not None:        # a complete bridge profile: a dictionary, or the path of a JSON file
             from .bridges import read_bridge_profile
             kwargs["bridge_profile"] = read_bridge_profile(kwargs["bridge_profile"])
+        if kwargs.get("vehicles") is not None:
+            kwargs = _vehicles(kwargs)
         data = {k: v for k, v in (("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
                                   ("width_by", width_by), ("color_table", color_table)) if v is not None}
         if color_table is not None:         # a mapping, a Series or a DataFrame: {edge id as text: colour}

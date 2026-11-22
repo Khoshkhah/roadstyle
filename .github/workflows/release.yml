@@ -13,9 +13,37 @@ on:
   workflow_dispatch:
 
 jobs:
+  # roadstyle's vehicles module (rust/roadstyle-wasm/build_vehicles.sh): one build for all platforms, in each wheel and in the sdist
+  vehicles-pkg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUST: "1.99.1"                  # the version of rust.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain and the wasm-bindgen program of the version in Cargo.lock
+        run: |
+          rustup toolchain install "$RUST" --profile minimal --target wasm32-unknown-unknown
+          rustup default "$RUST"
+          v=$(grep -m1 -A1 '^name = "wasm-bindgen"$' rust/Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p')
+          curl -sSfL "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$v/wasm-bindgen-$v-x86_64-unknown-linux-musl.tar.gz" | tar xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/wasm-bindgen-$v-x86_64-unknown-linux-musl" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          (cd rust && cargo fetch --locked)
+          rust/roadstyle-wasm/build_vehicles.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vehicles-pkg
+          path: src/roadstyle/static/vehicles/pkg/
+
   # one roadstyle wheel with the Rust engine in it for each platform (abi3: one wheel for every Python from 3.10), and the sdist
   # (docs/design/rust_library.md, decision 5)
   wheels:
+    needs: vehicles-pkg
     strategy:
       matrix:
         include:
@@ -32,6 +60,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vehicles-pkg
+          path: src/roadstyle/static/vehicles/pkg/
 
       - uses: PyO3/maturin-action@v1
         with:
@@ -98,10 +131,16 @@ jobs:
         run: python3 rust/roadstyle-mcp/tests/wheel_check.py dist/*.whl rust/roadstyle-rs/tests/data/monaco/roads.parquet
 
   sdist:
+    needs: vehicles-pkg
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vehicles-pkg
+          path: src/roadstyle/static/vehicles/pkg/
 
       - uses: PyO3/maturin-action@v1
         with:

@@ -67,6 +67,8 @@ manifest-path = "rust/roadstyle-py/Cargo.toml"
 # (rust/roadstyle-py/build.py), and the generated copy of the old paths for duckosm-rust (rust/roadstyle-assets/sync_old_paths.py)
 exclude = ["src/roadstyle/_rust.abi3.so", "src/roadstyle/**/__pycache__/**", "src/roadstyle/static/dashboard/**",
            "src/roadstyle/static/popup.css", "src/roadstyle/static/popup.js", "src/roadstyle/static/level_editor.html"]
+# roadstyle's vehicles module, a build output that git ignores (rust/roadstyle-wasm/build_vehicles.sh; the release workflow builds it)
+include = [{path = "src/roadstyle/static/vehicles/pkg/*", format = ["wheel", "sdist"]}]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

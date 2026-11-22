@@ -55,7 +55,7 @@ const RS_DEFAULTS = {
   prefix: "",                  // the prefix of the roads style's source and layer ids in the map ("rs-": the page added them so)
   adapter: null,               // the adapter of the page (adapter.js): {tile, rows, lines, query, schema, frames, style}, each optional; null: the page has its own road table
   road_table: null,            // the road table {props, mids, bboxes, lines} by row (stage 1); null: window.RS_SIDE, else none
-  vehicles: null,              // a traffic microsimulation run to load at start: {wasm, fcd, net, routes} as URLs (vehicles.js); null: none
+  vehicles: null,              // a traffic microsimulation run to load at start: the argument of rs.vehicles.load (vehicles.js); null: none
   vehicle_look: null,          // the look's vehicles section: the colour of each kind, each SUMO vClass, the numbers of a run (vehicles.js)
   sources: null,               // role -> {source, layer} (roadstyle:sources); null: the style's metadata, else its layers
   arrows: undefined,           // "points" | "line" | "line-center" | null (roadstyle:arrows); undefined: the metadata, else the style
@@ -217,7 +217,7 @@ export function rsDashboard(map, options){
   window.rsFilesAdapter = filesAdapter;
   window.rsEngineAdapter = engineAdapter;
   rs.vehicles = vehiclesApi();    // a traffic microsimulation run on the map (vehicles.js)
-  // a page with the option `vehicles` ({wasm, fcd, net, routes}: URLs) loads its run at start; a failure is reported, never hidden
+  // a page with the option `vehicles` (rs.vehicles.load's argument) loads its run at start; a failure is reported, never hidden
   if(o.vehicles) rs.vehicles.load(o.vehicles).catch(e => console.error("rs.vehicles: the run of the option vehicles did not load:", e));
   window.rsTools = rsTools;       // the alias of rs.tools
   window.rs = rs;                 // the page's one object (the window.rs* functions stay as they are)
