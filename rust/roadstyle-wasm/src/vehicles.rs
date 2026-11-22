@@ -12,8 +12,8 @@ use std::f64::consts::PI;
 use wasm_bindgen::prelude::*;
 
 /// The numbers for each vehicle in `frame`: x, y, z (origin metres), heading (radians, 0 = north, clockwise), pitch,
-/// roll, length, width, height (m), class (index into `classes()`), r, g, b, a (0: the layer colours by class), flags,
-/// vehicle (index into `ids()`).
+/// roll, length, width, height (m), class (index into `classes()`), level (the drawing level of its road, `setEdges`), 3 numbers
+/// not used, tunnel (1 on a tunnel road), vehicle (index into `ids()`).
 const STRIDE: usize = 16;
 /// MapLibre's earth radius (its Mercator coordinates).
 const EARTH_R: f64 = 6371008.8;
@@ -30,6 +30,10 @@ pub struct VehicleScene {
     /// the class of each vehicle type, as an index into `classes`
     type_class: Vec<u16>,
     classes: Vec<String>,
+    /// the drawing level and the tunnel flag (0 or 1) of each lane of the FCD file (`setEdges`), by its index in the run's lane ids
+    lane_look: Vec<[f32; 2]>,
+    /// the same for each lane of net.xml, by its index in the net's lanes
+    net_look: Vec<[f32; 2]>,
 }
 
 fn opt_f64(o: &Value, k: &str) -> Result<f64, JsError> {
@@ -96,7 +100,7 @@ impl VehicleScene {
         let m = mercator(lon, lat);
         let unit = 1.0 / (2.0 * PI * EARTH_R * lat.to_radians().cos());
         let run = Run::new(samples, net, &vtypes, opts).map_err(err)?;
-        Ok(VehicleScene { run, origin: [lon, lat, m[0], m[1], unit], type_class, classes })
+        Ok(VehicleScene { run, origin: [lon, lat, m[0], m[1], unit], type_class, classes, lane_look: Vec::new(), net_look: Vec::new() })
     }
 
     /// [lon, lat, Mercator x, Mercator y, Mercator size of one metre] of the scene origin.
@@ -122,6 +126,30 @@ impl VehicleScene {
         .to_string()
     }
 
+    /// setEdges(json): the page's road of each SUMO edge, `{edge id: [level, tunnel]}` (the road's drawing level, its `fill_level`, and
+    /// whether it is a tunnel). A lane takes its edge's; a lane inside a junction takes the lane it leads to. `frame` and `lanes` then
+    /// give each vehicle and each lane its level and tunnel flag. Gives the number of lanes of net.xml whose edge is not in `json`
+    /// (drawn at level 0, not as a tunnel).
+    #[wasm_bindgen(js_name = setEdges)]
+    pub fn set_edges(&mut self, json: &str) -> Result<u32, JsError> {
+        let edges: HashMap<String, [f32; 2]> =
+            serde_json::from_str(json).map_err(|e| JsError::new(&format!("VehicleScene.setEdges: not {{edge: [level, tunnel]}}: {e}")))?;
+        let Some(net) = self.run.net.as_ref() else { return Ok(0) };
+        let own = |i: usize| edges.get(&net.lanes[i].edge).copied();
+        let mut missing = 0;
+        self.net_look = (0..net.lanes.len())
+            .map(|i| {
+                let l = if net.lanes[i].internal { net.next[i].iter().find_map(|&j| own(j as usize)) } else { own(i) };
+                l.unwrap_or_else(|| {
+                    missing += 1;
+                    [0.0, 0.0]
+                })
+            })
+            .collect();
+        self.lane_look = self.run.samples.lanes.iter().map(|id| net.by_id.get(id).map_or([0.0, 0.0], |&i| self.net_look[i as usize])).collect();
+        Ok(missing)
+    }
+
     /// The lanes and the junctions of the run's net.xml as a GeoJSON FeatureCollection, the surface that the vehicles drive on: first
     /// a Polygon for each junction's area (`kind` "junction", `id`), then a LineString in lon/lat (the lane's middle) for each lane
     /// (`kind` "lane", `id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction). Empty with no net.xml.
@@ -135,12 +163,27 @@ impl VehicleScene {
                 }
                 json!({"type": "Feature", "properties": {"kind": "junction", "id": j.id}, "geometry": {"type": "Polygon", "coordinates": [ring]}})
             });
+            let look = |i: usize| self.net_look.get(i).copied().unwrap_or([0.0, 0.0]);
+            // a junction is at the lowest level of its lanes
+            let mut jlevel: HashMap<&str, f32> = HashMap::new();
+            for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| l.internal) {
+                let j = l.edge.trim_start_matches(':').rsplit_once('_').map_or(l.edge.as_str(), |(j, _)| j);
+                let e = jlevel.entry(j).or_insert(f32::INFINITY);
+                *e = e.min(look(i)[0]);
+            }
+            let junctions = junctions.map(|mut f| {
+                let lv = jlevel.get(f["properties"]["id"].as_str().unwrap_or("")).copied().filter(|v| v.is_finite()).unwrap_or(0.0);
+                f["properties"]["level"] = json!(lv);
+                f
+            });
             junctions.chain(n.lanes
                 .iter()
-                .filter(|l| l.line.pts.len() > 1)
-                .map(|l| {
+                .enumerate()
+                .filter(|(_, l)| l.line.pts.len() > 1)
+                .map(|(i, l)| {
+                    let [lv, tun] = look(i);
                     let c: Vec<[f64; 2]> = l.line.pts.iter().map(r7).collect();
-                    json!({"type": "Feature", "properties": {"kind": "lane", "id": l.id, "w": l.width, "internal": l.internal},
+                    json!({"type": "Feature", "properties": {"kind": "lane", "id": l.id, "w": l.width, "internal": l.internal, "level": lv, "tunnel": tun > 0.0},
                            "geometry": {"type": "LineString", "coordinates": c}})
                 }))
                 .collect()
@@ -156,6 +199,7 @@ impl VehicleScene {
         for s in states {
             let m = mercator(s.lon, s.lat);
             let size = self.run.sizes[s.vtype as usize];
+            let look = self.lane_look.get(s.lane as usize).copied().unwrap_or([0.0, 0.0]);
             out.extend_from_slice(&[
                 ((m[0] - ox) / unit) as f32,
                 ((m[1] - oy) / unit) as f32,
@@ -167,11 +211,11 @@ impl VehicleScene {
                 size[1],
                 size[2],
                 self.type_class[s.vtype as usize] as f32,
+                look[0],
                 0.0,
                 0.0,
                 0.0,
-                0.0,
-                0.0,
+                look[1],
                 s.vehicle as f32,
             ]);
         }
