@@ -79,11 +79,11 @@ pub struct Lane {
     /// and right), each once, in the file's order; empty for an internal lane
     pub dirs: String,
     /// a vehicle can have to stop or give way at the lane's end: one of its connections has a traffic light (`tl`) or a state that
-    /// is not major (`m` minor, `=` equal, `s` stop, `w` all-way stop, `o`/`O` a light that is off or blinks)
+    /// is not major (`m` minor, `=` equal, `s` stop, `w` all-way stop, `o`/`O` a light that is off or blinks); U-turns not counted
     pub stops: bool,
     /// the lane is on a ring of a `<roundabout>`
     pub ring: bool,
-    /// the number of edges that the connections from the lane's edge go to (the ways out at its end)
+    /// the number of edges that the connections from the lane's edge go to (the ways out at its end), U-turns not counted
     pub ways_out: u32,
 }
 
@@ -164,7 +164,8 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
                 let (Some(from), Some(to)) = (t.get("from"), t.get("to")) else { continue };
                 let (fl, tl) = (t.get("fromLane").unwrap_or("0"), t.get("toLane").unwrap_or("0"));
                 let a = format!("{from}_{fl}");
-                if !from.starts_with(':') {
+                // a U-turn (dir t: duckOSM's network has one at most nodes) is no way out of its own and makes no stop line
+                if !from.starts_with(':') && t.get("dir") != Some("t") {
                     if t.get("tl").is_some() || t.get("state").is_some_and(|st| st.chars().any(|c| "m=swoO".contains(c))) {
                         stops.insert(a.clone());
                     }

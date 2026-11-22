@@ -15,6 +15,7 @@ let _tunnelsOn=true;   // rsSetTunnels: hide every below-ground (lvl<0) road, it
 const _ovIds={};       // an overlay's own rsFilter(ids, label) id set, by label (an attached one: composed with its edges' filter below)
 const _ovKinds={};     // rsSetKinds: the kinds of a base-map layer that show, by label (null: all)
 const _ovBase={};      // a not attached overlay layer's own filter, by layer id (read once)
+let _hideRows=null, _hideExpr=null;   // rsHideRoads: the rows whose own drawing another layer draws (vehicles.js: the lanes of a SUMO run); null: none
 let _modes=null, _modeRows=null;   // rsSetModes: the modes whose roads show (null: all), and the rows that one of them can use
 // the overlay attached to edges (Overlay(edge_col=...)) that a layer draws: core.js, _itemOv
 const _fltLayers=()=>map.getStyle().layers.filter(l=>RS_ROLES.has(_role(l)) || _itemOv(l.id));
@@ -29,13 +30,13 @@ export function _roadTest(){
   const ids = _qIds && _modeRows ? _qIds.filter(i=>_modeRows.has(i)) : _qIds || (_modeRows && [..._modeRows]);
   const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c)), hid=new Set(hidden), q=ids && new Set(ids);
   const edgeOn = i=>{ const p=_rprops(i), v=p.lvl||0;
-    return !hid.has(p.__rs_cls) && !(p.__rs_access && _accHid.has(p.__rs_access)) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
+    return !(_hideRows && _hideRows.has(i)) && !hid.has(p.__rs_cls) && !(p.__rs_access && _accHid.has(p.__rs_access)) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
   return {hidden, q, edgeOn};
 }
 export function _applyRoadFilters(){
   const {hidden, q, edgeOn} = _roadTest();
   const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
-  ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
+  ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size || _hideRows)
     ? _sfeats((_src(src)||{}).source).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
   _bmFilter(multi.decks);   // the sloped mesh of the 3D decks shows the same features as their pick layers
   const and = (f,c)=>f?["all",f,c]:c;
@@ -59,12 +60,20 @@ export function _applyRoadFilters(){
       if(!_bridgesOn) f=and(f, ["<",["coalesce",["get",lvl],0],1]);
       if(!_tunnelsOn) f=and(f, [">=",["coalesce",["get",lvl],0],0]);
       if(q) f=and(f, kind==="roads" ? qr : qe);
+      // a road that another layer draws: hide its own pieces and arrows, keep its name
+      if(_hideExpr && !ov && !(l.type==="symbol" && l.layout && l.layout["text-field"])) f=and(f, ["!", _hideExpr]);
       if(ov && _ovIds[ov.label]) f=and(f, _has(["id"],_ovIds[ov.label]));
     }
     // validate:false: our own filters need no grammar check, which cost ~6 ms a layer (a mode or class switch on a page of ~500 layers froze it ~3 s)
     try{ map.setFilter(l.id,f,{validate:false}); }catch(e){}
   });
   return hidden;
+}
+// rsHideRoads(rows): the page does not draw these roads itself (their names stay), because another layer draws them; null: none
+export function rsHideRoads(rows){
+  _hideRows = rows && rows.length ? new Set(rows) : null;
+  _hideExpr = _hideRows && _has(["id"], [..._hideRows]);
+  _applyRoadFilters();
 }
 export function rsSetClasses(visible){
   _fltVis=new Set(visible);
@@ -172,6 +181,7 @@ export function useFilter(){
 export function initFilter(){
   map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
   window.rsSetClasses = rsSetClasses;
+  window.rsHideRoads = rsHideRoads;
   window.rsSetAccess = rsSetAccess;
   window.rsSetBridges = rsSetBridges;
   window.rsSetTunnels = rsSetTunnels;

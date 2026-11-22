@@ -8,7 +8,7 @@ mod net;
 mod track;
 
 pub use fcd::{read_fcd_parquet, Samples, NONE};
-pub use geo::offset_line;
+pub use geo::{offset as offset_m, offset_line, turn_deg};
 pub use net::{read_net, read_vtypes, Lane, Net, VTypeRow};
 pub use track::{Placement, Report, Run, RunOptions, VehicleState};
 

@@ -92,6 +92,25 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
     return roads, features, level_kw
 
 
+def crossings(db) -> list[str]:
+    """The ids of the nodes where a footway crosses a road in the duckOSM file ``db``: the end nodes of its walking edges with
+    ``walk_type`` "crossing" (SUMO's junction id = the node id). The zebras of a SUMO run's lanes (``vehicles={"crossings": ...}``).
+    Empty when the file has no walking network."""
+    import duckdb
+
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        cols = {r[0] for r in con.execute("SELECT column_name FROM information_schema.columns WHERE table_schema = 'walking' "
+                                          "AND table_name = 'edges'").fetchall()}
+        if not {"walk_type", "source", "target"} <= cols:
+            return []
+        rows = con.execute("SELECT DISTINCT n FROM (SELECT source AS n FROM walking.edges WHERE walk_type = 'crossing' UNION "
+                           "SELECT target FROM walking.edges WHERE walk_type = 'crossing')").fetchall()
+    finally:
+        con.close()
+    return sorted(str(r[0]) for r in rows)
+
+
 def ground(db) -> dict | None:
     """The page option ``ground`` of the duckOSM file ``db`` (docs/design/ground_terrain.md): the ground's facts from
     ``main.elevation_metadata`` (the row of ``ele``) and ``terrain``, the area's terrain file made by the engine from
@@ -180,6 +199,8 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
         kw = {"template": "dashboard", "dashboard": {"panel": None}, **kw}
     if "ground" not in kw:
         kw["ground"] = ground(db)                    # the area's own ground when the file has one (the standard "The ground reference")
+    if kw.get("vehicles") is not None and "crossings" not in kw["vehicles"]:
+        kw["vehicles"] = {**kw["vehicles"], "crossings": crossings(db)}     # the zebras: where a footway crosses
     kw = vehicles_option(kw)                         # a SUMO run: its local files, roadstyle's vehicles module and the play bar
     o = _options(db, mode, theme, paths, level_kw, kw)
     lk = rust().resolve_look(json.dumps(o))

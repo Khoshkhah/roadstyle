@@ -22,6 +22,28 @@ fn mercator(lon: f64, lat: f64) -> [f64; 2] {
     [(lon + 180.0) / 360.0, 0.5 - (PI / 4.0 + lat.to_radians() / 2.0).tan().ln() / (2.0 * PI)]
 }
 
+/// The junction of an internal edge or lane id (`:<junction>_<n>` or `:<junction>_<n>_<m>`): the text before the last `_`.
+fn junction_of(edge: &str) -> &str {
+    edge.trim_start_matches(':').rsplit_once('_').map_or(edge, |(j, _)| j)
+}
+
+/// The junction at the end of lane i: the junction of the internal lanes it goes on to.
+fn end_junction(n: &roadstyle_sim::Net, i: usize) -> Option<String> {
+    n.next[i].iter().map(|&k| &n.lanes[k as usize]).find(|l| l.internal).map(|l| junction_of(&l.edge).to_string())
+}
+
+/// The junctions that a road only passes through: every lane that goes into it has one way out.
+fn through_junctions(n: &roadstyle_sim::Net) -> std::collections::HashSet<String> {
+    let mut ok: HashMap<String, bool> = HashMap::new();
+    for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| !l.internal) {
+        if let Some(j) = end_junction(n, i) {
+            let e = ok.entry(j).or_insert(true);
+            *e = *e && l.ways_out <= 1;
+        }
+    }
+    ok.into_iter().filter(|(_, v)| *v).map(|(k, _)| k).collect()
+}
+
 #[wasm_bindgen]
 pub struct VehicleScene {
     run: Run,
@@ -34,6 +56,8 @@ pub struct VehicleScene {
     lane_look: Vec<[f32; 2]>,
     /// the same for each lane of net.xml, by its index in the net's lanes
     net_look: Vec<[f32; 2]>,
+    /// the junctions where a footway crosses the road (`setCrossings`): their lanes get a zebra
+    crossings: std::collections::HashSet<String>,
 }
 
 fn opt_f64(o: &Value, k: &str) -> Result<f64, JsError> {
@@ -100,7 +124,8 @@ impl VehicleScene {
         let m = mercator(lon, lat);
         let unit = 1.0 / (2.0 * PI * EARTH_R * lat.to_radians().cos());
         let run = Run::new(samples, net, &vtypes, opts).map_err(err)?;
-        Ok(VehicleScene { run, origin: [lon, lat, m[0], m[1], unit], type_class, classes, lane_look: Vec::new(), net_look: Vec::new() })
+        Ok(VehicleScene { run, origin: [lon, lat, m[0], m[1], unit], type_class, classes, lane_look: Vec::new(), net_look: Vec::new(),
+                          crossings: Default::default() })
     }
 
     /// [lon, lat, Mercator x, Mercator y, Mercator size of one metre] of the scene origin.
@@ -150,6 +175,15 @@ impl VehicleScene {
         Ok(missing)
     }
 
+    /// setCrossings(json): the ids of the junctions where a footway crosses the road (a JSON list of texts; duckOSM: the end nodes of
+    /// its walking edges with walk_type "crossing"). `lanes` then gives a zebra on the lanes through each of them.
+    #[wasm_bindgen(js_name = setCrossings)]
+    pub fn set_crossings(&mut self, json: &str) -> Result<(), JsError> {
+        let ids: Vec<Value> = serde_json::from_str(json).map_err(|e| JsError::new(&format!("VehicleScene.setCrossings: not a list: {e}")))?;
+        self.crossings = ids.iter().map(|v| v.as_str().map_or_else(|| v.to_string(), str::to_string)).collect();
+        Ok(())
+    }
+
     /// The lanes and the junctions of the run's net.xml as a GeoJSON FeatureCollection, the surface that the vehicles drive on: first
     /// a Polygon for each junction's area (`kind` "junction", `id`, `level`, `tunnel`), then a LineString in lon/lat (the lane's middle) for each lane
     /// (`kind` "lane", `id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction), then the road marks of the
@@ -171,14 +205,17 @@ impl VehicleScene {
             // a junction is at the lowest level of its lanes, and in a tunnel when all its lanes are
             let mut jlook: HashMap<&str, (f32, bool)> = HashMap::new();
             for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| l.internal) {
-                let j = l.edge.trim_start_matches(':').rsplit_once('_').map_or(l.edge.as_str(), |(j, _)| j);
+                let j = junction_of(&l.edge);
                 let e = jlook.entry(j).or_insert((f32::INFINITY, true));
                 *e = (e.0.min(look(i)[0]), e.1 && look(i)[1] > 0.0);
             }
+            let through = through_junctions(n);
             let junctions = junctions.map(|mut f| {
-                let (lv, tun) = jlook.get(f["properties"]["id"].as_str().unwrap_or("")).copied().filter(|v| v.0.is_finite()).unwrap_or((0.0, false));
+                let id = f["properties"]["id"].as_str().unwrap_or("").to_string();
+                let (lv, tun) = jlook.get(id.as_str()).copied().filter(|v| v.0.is_finite()).unwrap_or((0.0, false));
                 f["properties"]["level"] = json!(lv);
                 f["properties"]["tunnel"] = json!(tun);
+                f["properties"]["through"] = json!(through.contains(&id));
                 f
             });
             junctions.chain(n.lanes
@@ -197,7 +234,7 @@ impl VehicleScene {
         json!({"type": "FeatureCollection", "features": feats}).to_string()
     }
 
-    /// The road marks of the lanes that are not internal (see `lanes`).
+    /// The road marks of the lanes that are not internal, and the zebras (see `lanes`).
     fn marks(&self, n: &roadstyle_sim::Net, look: &dyn Fn(usize) -> [f32; 2], r7: impl Fn(&[f64; 2]) -> [f64; 2]) -> Vec<Value> {
         let line = |pts: Vec<[f64; 2]>| json!({"type": "LineString", "coordinates": pts.iter().map(&r7).collect::<Vec<_>>()});
         let feat = |kind: &str, i: usize, geom: Value, extra: Value| {
@@ -213,13 +250,38 @@ impl VehicleScene {
             by_edge.entry(l.edge.as_str()).or_default().push(i);
         }
         let mut out = Vec::new();
-        // a roundabout's ring: its lanes inside the junctions get the ring's lines too, so the ring's marks are one unbroken ring
+        let through = through_junctions(n);
+        // the lane before each lane
         let mut from: HashMap<u32, usize> = HashMap::new();
         for (j, nx) in n.next.iter().enumerate() {
             for &k in nx {
                 from.entry(k).or_insert(j);
             }
         }
+        // a zebra where a footway crosses: stripes along each lane through the junction, 0.5 m wide with 0.5 m gaps across the lane,
+        // at least 3 m long (a short junction: centred on it)
+        for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| l.internal && l.line.pts.len() > 1) {
+            let len = l.line.len();
+            // only the lanes that go straight through: from the lane in to the lane out a turn under 30 degrees (not a turn or a U-turn;
+            // a short lane inside a junction is often a straight line, also for a U-turn)
+            let (Some(&j), Some(&k)) = (from.get(&(i as u32)), n.next[i].first()) else { continue };
+            let (a, b) = (&n.lanes[j].line, &n.lanes[k as usize].line);
+            if !self.crossings.contains(junction_of(&l.edge)) || roadstyle_sim::turn_deg(a.at(a.len()).1, b.at(0.0).1).abs() > 30.0 {
+                continue;
+            }
+            let pts = if len >= 3.0 { l.line.pts.clone() } else {
+                let ((a, h), (b, _)) = (l.line.at(0.0), l.line.at(len));
+                let (e, nn) = (h.to_radians().sin(), h.to_radians().cos());
+                let half = (3.0 - len) / 2.0;
+                vec![roadstyle_sim::offset_m(a, -e * half, -nn * half), roadstyle_sim::offset_m(b, e * half, nn * half)]
+            };
+            let mut y = -l.width / 2.0 + 0.25;
+            while y <= l.width / 2.0 - 0.25 + 1e-9 {
+                out.push(feat("zebra", i, line(offset_line(&pts, y)), json!({})));
+                y += 1.0;
+            }
+        }
+        // a roundabout's ring: its lanes inside the junctions get the ring's lines too, so the ring's marks are one unbroken ring
         for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| l.internal && l.line.pts.len() > 1) {
             let Some(&j) = from.get(&(i as u32)) else { continue };
             // only a lane that goes on along the ring in the same lane (not one that changes lanes or leaves the ring)
@@ -246,8 +308,9 @@ impl VehicleScene {
                     out.push(feat("edge_line", i, line(right.clone()), json!({})));
                 }
                 out.push(feat(if k == last { "edge_line" } else { "lane_line" }, i, line(left.clone()), json!({})));
-                // a stop line only where SUMO can make a vehicle stop or give way, never on a roundabout's ring
-                if l.stops && !l.ring {
+                // a stop line only where SUMO can make a vehicle stop or give way, never on a roundabout's ring or where the road only
+                // passes through a junction
+                if l.stops && !l.ring && !end_junction(n, i).is_some_and(|j| through.contains(&j)) {
                     out.push(feat("stop", i, line(vec![*left.last().unwrap(), *right.last().unwrap()]), json!({})));
                 }
                 // turn arrows only where the lane's end has more than one way out, off a ring, and with room (15 m)

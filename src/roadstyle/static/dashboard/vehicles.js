@@ -15,13 +15,15 @@
 // tunnel; by the SUMO edge id = the road's `edge_id`; VehicleScene.setEdges). Not `fill_level`: that is the drawing order of the
 // classes, and two ground roads of a junction can differ in it. Each level has its own layers, from the lowest up: the junctions, the lane markings, the lanes,
 // then the vehicles of that level. So a bridge's lanes cover the vehicles under the bridge, and its vehicles are on top.
-// THE TUNNELS: a lane and a vehicle on a tunnel road fade as much as the page's tunnel roads: they are drawn see-through, with the
-// opacity (1 - the tunnel strength of tunnel.js)^2 (0.16 at the default 60 %: a faint ghost, as the tunnel road, whose colours move
-// that far toward the land colour), sides and all, in each theme; with the terrain on, the tunnels' fade (rs_terrain_tunnel,
-// elevation.js) multiplies it.
+// THE TUNNELS: a lane, a mark and a vehicle on a tunnel road fade as much as the page's tunnel roads: their colours move toward the
+// map's background colour (the background layer, in each theme) by 1 - (1 - the tunnel strength of tunnel.js)^2 (84 % at the default
+// 60 %: a faint ghost, sides and all), times the tunnels' fade with the terrain on (rs_terrain_tunnel, elevation.js). The colours are
+// opaque, so two pieces that overlap do not get darker.
+// THE PAGE'S ROADS: where the lanes draw a road (its edge is in net.xml), the page does not draw it itself (rsHideRoads; its name stays).
 // P1: flat ground (z 0), boxes, no camera.
 import {map, O, RS_PREFIX, _emit, _side} from "./core.js";
 import {TUNNEL} from "./tunnel.js";
+import {rsHideRoads} from "./filter.js";
 
 const _VH_STRIDE = 16;                 // the numbers of one vehicle in VehicleScene.frame
 const _VH_MAX_CLASSES = 8;             // the colours the shader holds (a class number past it takes colour number % 8)
@@ -29,7 +31,7 @@ const _VH_KEYS = ["placement", "teleport_m", "lane_change_s", "heading_lookahead
 // the layers of one level: the junctions, the lane markings, the lanes, the vehicles
 // the layers of one level, from the bottom up; the vehicles last
 const _VH_PARTS = ["vehicle-junctions", "vehicle-junction-edges", "vehicle-lane-fill", "vehicle-lane-edges", "vehicle-lane-lines",
-                   "vehicle-stop-lines", "vehicle-turn-arrows", "vehicles"];
+                   "vehicle-stop-lines", "vehicle-zebras", "vehicle-turn-arrows", "vehicles"];
 const _vhIdsOf = (lv) => Object.fromEntries(_VH_PARTS.map(k => [k, `${RS_PREFIX}${k}-${lv}`]));
 const _vhVehId = (lv) => `${RS_PREFIX}vehicles-${lv}`;
 const _VH_SEAM_M = 1.0;                // the outline of a junction's area, m (round): it closes the seams and notches to its lanes and rounds its corners
@@ -60,7 +62,8 @@ in vec4 i_pos;                  // x, y, z (origin metres; y south), heading (ra
 in vec4 i_size;                 // length, width, height (m), class
 in float i_tun;                 // 1 on a tunnel road
 uniform mat4 u_m; uniform vec4 u_col[${_VH_MAX_CLASSES}];
-uniform float u_tunop;          // the opacity of a vehicle on a tunnel road
+uniform float u_tunop;          // how much a vehicle on a tunnel road keeps of its colour (the rest is the background's)
+uniform vec3 u_bg;              // the map's background colour
 out vec4 v_col;
 void main(){
   float h = i_pos.w;
@@ -70,8 +73,9 @@ void main(){
   vec3 n = normalize(vec3(f * a_nrm.x + r * a_nrm.y, a_nrm.z));
   float shade = 0.55 + 0.45 * max(dot(n, normalize(vec3(-0.4, -0.5, 0.75))), 0.0);
   vec4 c = u_col[int(i_size.w) % ${_VH_MAX_CLASSES}];
-  c.a *= mix(1.0, u_tunop, i_tun);
-  v_col = vec4(c.rgb * shade * c.a, c.a);
+
+  vec3 rgb = mix(u_bg, c.rgb * shade, mix(1.0, u_tunop, i_tun));
+  v_col = vec4(rgb * c.a, c.a);
 }`;
 const _VH_FS = `#version 300 es
 precision mediump float; in vec4 v_col; out vec4 o_col; void main(){ o_col = v_col; }`;
@@ -106,7 +110,7 @@ function _vhLayerFor(level){
     gl.linkProgram(_vhProg);
     if(!gl.getProgramParameter(_vhProg, gl.LINK_STATUS)) throw new Error("rs.vehicles: program: " + gl.getProgramInfoLog(_vhProg));
     for(const k of ["a_pos", "a_nrm", "i_pos", "i_size", "i_tun"]) _vhLoc[k] = gl.getAttribLocation(_vhProg, k);
-    for(const k of ["u_m", "u_col", "u_tunop"]) _vhLoc[k] = gl.getUniformLocation(_vhProg, k);
+    for(const k of ["u_m", "u_col", "u_tunop", "u_bg"]) _vhLoc[k] = gl.getUniformLocation(_vhProg, k);
     _vhVao = gl.createVertexArray(); gl.bindVertexArray(_vhVao);
     const box = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, box); gl.bufferData(gl.ARRAY_BUFFER, _vhBox(), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(_vhLoc.a_pos); gl.vertexAttribPointer(_vhLoc.a_pos, 3, gl.FLOAT, false, 24, 0);
@@ -127,6 +131,7 @@ function _vhLayerFor(level){
       gl.uniformMatrix4fv(_vhLoc.u_m, false, new Float32Array(m));
       gl.uniform4fv(_vhLoc.u_col, _vhColours);
       gl.uniform1f(_vhLoc.u_tunop, _vhTunnelOpacity());
+      gl.uniform3fv(_vhLoc.u_bg, _vhRgba(_vhBg(), "background").slice(0, 3));
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
       gl.disable(gl.CULL_FACE); gl.disable(gl.STENCIL_TEST);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -168,8 +173,18 @@ function _vhTick(gl, now){
   if(now - _vhSentAt > 250){ _vhSentAt = now; _emit("rs:vehicletime", {t: _vhT}); }
 }
 
-// the opacity of a lane or a vehicle on a tunnel road: (1 - the tunnel strength)^2 (tunnel.js; strength 0 when the page has no tunnel
-// look), times the tunnels' fade with the terrain on (elevation.js sets rs_terrain_tunnel)
+// the map's background colour in the theme of the moment (its background layer)
+function _vhBg(){
+  const l = map.getStyle().layers.find(x => x.type === "background"), c = l && map.getPaintProperty(l.id, "background-color");
+  return typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c) ? c : (_vhDark() ? "#000000" : "#ffffff");
+}
+// a colour on a tunnel road: moved toward the background, keeping _vhTunnelOpacity() of itself
+function _vhTunnelHex(hex){
+  const a = _vhRgba(hex, "lane"), b = _vhRgba(_vhBg(), "background"), k = _vhTunnelOpacity();
+  return "#" + [0, 1, 2].map(i => Math.round((b[i] + (a[i] - b[i]) * k) * 255).toString(16).padStart(2, "0")).join("");
+}
+// how much of its colour a lane or a vehicle on a tunnel road keeps: (1 - the tunnel strength)^2 (tunnel.js; strength 0 when the page has
+// no tunnel look), times the tunnels' fade with the terrain on (elevation.js sets rs_terrain_tunnel)
 function _vhTunnelOpacity(){
   const k = (1 - (TUNNEL && TUNNEL.strength != null ? +TUNNEL.strength : 0) / 100) ** 2;
   let f = 1; try { const v = map.getGlobalState().rs_terrain_tunnel; if(v != null) f = +v; } catch(e){ /* a map with no global state */ }
@@ -190,15 +205,14 @@ function _vhPx(m, lat){
   return ["interpolate", ["exponential", 2], ["zoom"], 10, ["*", m, k * 2 ** 10], 24, ["*", m, k * 2 ** 24]];
 }
 
-// the lane layers: their colours in the theme (opaque; a piece on a tunnel road faded, _vhTunnelOpacity)
+// the lane layers: their colours in the theme, opaque; a piece on a tunnel road in its faded colour (_vhTunnelHex)
 function _vhLanePaint(){
   const l = O.vehicle_look.lanes, fill = _vhDark() ? l.fill.dark : l.fill.light, mark = _vhDark() ? l.marking.dark : l.marking.light;
-  const op = ["case", ["get", "tunnel"], _vhTunnelOpacity(), 1];
-  const set = (id, kind, col) => { if(map.getLayer(id)){ map.setPaintProperty(id, `${kind}-color`, col); map.setPaintProperty(id, `${kind}-opacity`, op); } };
+  const set = (id, kind, col) => { if(map.getLayer(id)) map.setPaintProperty(id, `${kind}-color`, ["case", ["get", "tunnel"], _vhTunnelHex(col), col]); };
   for(const lv of _vhLevels){
     const id = _vhIdsOf(lv);
     set(id["vehicle-junctions"], "fill", fill); set(id["vehicle-junction-edges"], "line", fill); set(id["vehicle-lane-fill"], "line", fill);
-    for(const k of ["vehicle-lane-edges", "vehicle-lane-lines", "vehicle-stop-lines"]) set(id[k], "line", mark);
+    for(const k of ["vehicle-lane-edges", "vehicle-lane-lines", "vehicle-stop-lines", "vehicle-zebras"]) set(id[k], "line", mark);
     set(id["vehicle-turn-arrows"], "icon", mark);
   }
 }
@@ -244,7 +258,8 @@ function _vhAddLaneLayers(src){
   for(const lv of _vhLevels){
     const id = _vhIdsOf(lv), veh = id.vehicles, at = ["==", ["get", "level"], lv], of = (kind) => ["all", at, ["==", ["get", "kind"], kind]];
     map.addLayer({id: id["vehicle-junctions"], type: "fill", source: src, filter: of("junction")}, veh);
-    map.addLayer({id: id["vehicle-junction-edges"], type: "line", source: src, filter: of("junction"), layout: round,
+    // no outline where the road only passes through (it would stick out at the road's sides)
+    map.addLayer({id: id["vehicle-junction-edges"], type: "line", source: src, filter: ["all", of("junction"), ["!", ["get", "through"]]], layout: round,
                   paint: {"line-width": _vhPx(_VH_SEAM_M, lat)}}, veh);
     // each lane a little wider than it is: two lanes side by side overlap, with no seam between them
     map.addLayer({id: id["vehicle-lane-fill"], type: "line", source: src, filter: of("lane"), layout: butt,
@@ -255,6 +270,8 @@ function _vhAddLaneLayers(src){
                   paint: {"line-width": _vhPx(mm, lat), "line-dasharray": [L.dash_m[0] / mm, L.dash_m[1] / mm]}}, veh);
     map.addLayer({id: id["vehicle-stop-lines"], type: "line", source: src, filter: of("stop"), layout: butt,
                   paint: {"line-width": _vhPx(L.stop_m, lat)}}, veh);
+    map.addLayer({id: id["vehicle-zebras"], type: "line", source: src, filter: of("zebra"), layout: butt,
+                  paint: {"line-width": _vhPx(0.5, lat)}}, veh);
     map.addLayer({id: id["vehicle-turn-arrows"], type: "symbol", source: src, filter: of("arrow"),
                   layout: {"icon-image": ["concat", `${RS_PREFIX}rs-turn-`, ["get", "dirs"]], "icon-rotate": ["get", "angle"],
                            "icon-rotation-alignment": "map", "icon-pitch-alignment": "map", "icon-allow-overlap": true,
@@ -324,11 +341,11 @@ async function _vhEdges(){
 }
 async function _vhText(x){ return x == null ? undefined : (/^\s*</.test(x) ? x : await (await fetch(x)).text()); }
 
-// load({wasm, wasm_bin?, fcd, net, routes, lanes?, options?, colours?}): `wasm` the URL of roadstyle_wasm.js built with the feature "vehicles";
+// load({wasm, wasm_bin?, fcd, net, routes, lanes?, crossings?, options?, colours?}): `wasm` the URL of roadstyle_wasm.js built with the feature "vehicles";
 // `wasm_bin` (optional) the bytes or the URL of its roadstyle_wasm_bg.wasm, or of that file in gzip (needed when `wasm` is a data: URL, which has no folder); `fcd` the
 // bytes or the URL of SUMO's FCD Parquet file; `net` the text or the URL of the run's net.xml; `routes` (optional) the text or URL of
 // a file with the <vType> elements. `options` (every key of _VH_KEYS) and `colours` ({class: "#rrggbb"}) default to the look's vehicles
-// section. `lanes` (default true): draw the lanes of net.xml under the vehicles. Gives the run's report and sends rs:vehicleload. A page with the option `vehicles` calls it at start (index.js).
+// section. `lanes` (default true): draw the lanes of net.xml under the vehicles (and not the page's own drawing of their roads). `crossings`: the ids of the junctions where a footway crosses (a zebra). Gives the run's report and sends rs:vehicleload. A page with the option `vehicles` calls it at start (index.js).
 async function _vhLoad(o){
   for(const k of ["wasm", "fcd"]) if(o[k] == null) throw new Error(`rs.vehicles.load: ${k} is missing`);
   if((o.options == null || o.colours == null) && !O.vehicle_look)
@@ -343,8 +360,15 @@ async function _vhLoad(o){
   _vhPaint();
   _vhScene = scene; _vhOrigin = scene.origin(); _vhIds = scene.ids();
   _vhReport = JSON.parse(scene.report());
-  scene.setEdges(JSON.stringify(await _vhEdges()));
+  const edges = await _vhEdges();
+  scene.setEdges(JSON.stringify(edges));
+  scene.setCrossings(JSON.stringify((o.crossings || []).map(String)));
   _vhLanes = o.lanes === false ? null : JSON.parse(scene.lanes());
+  // the page's own drawing of the roads that the lanes draw
+  if(_vhLanes){
+    const inNet = new Set(_vhLanes.features.filter(f => f.properties.kind === "lane" && !f.properties.internal).map(f => f.properties.id.replace(/_\d+$/, "")));
+    rsHideRoads(_side().props.map((p, i) => p && p.edge_id != null && inNet.has(String(p.edge_id)) ? i : -1).filter(i => i >= 0));
+  }
   _vhLevels = [...new Set([0, ...(_vhLanes ? _vhLanes.features.map(f => f.properties.level) : [])])].sort((a, b) => a - b);
   _vhT = _vhReport.t0; _vhDirty = true; _vhPause();
   // the style can be busy after "load" (a theme or base map change of the page): wait for an "idle" with the style loaded, not for
