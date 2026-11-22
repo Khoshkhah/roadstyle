@@ -59,10 +59,13 @@ def _local(v):
     return Path(v) if isinstance(v, str) and "://" not in v and not v.startswith("data:") and Path(v).is_file() else None
 
 
-def _vehicles(kwargs):
-    """The page option ``vehicles``: a local file goes into the page (the FCD Parquet as a data: URL, ``net`` and ``routes`` as their
+def vehicles_option(kwargs):
+    """The keywords with the page option ``vehicles`` made ready for the page (both page writers call it: ``_engine.render_page`` and
+    ``duckosm.page``; no ``vehicles``: the keywords as they are). a local file goes into the page (the FCD Parquet as a data: URL, ``net`` and ``routes`` as their
     XML text), a URL stays a URL. With no ``wasm``, the page gets roadstyle's vehicles module (``VEHICLES_PKG``) inside it, and the
     play bar (static/vehicles/play_bar.js) before the page's own script."""
+    if kwargs.get("vehicles") is None:
+        return kwargs
     v = dict(kwargs["vehicles"])
     if v.get("fcd") is None or v.get("net") is None:
         raise ValueError("vehicles: give 'fcd' (SUMO's FCD Parquet, --fcd-output.geo true) and 'net' (the run's net.xml)")
@@ -204,8 +207,6 @@ def render_edges(
         if kwargs.get("bridge_profile") is not None:        # a complete bridge profile: a dictionary, or the path of a JSON file
             from .bridges import read_bridge_profile
             kwargs["bridge_profile"] = read_bridge_profile(kwargs["bridge_profile"])
-        if kwargs.get("vehicles") is not None:
-            kwargs = _vehicles(kwargs)
         data = {k: v for k, v in (("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
                                   ("width_by", width_by), ("color_table", color_table)) if v is not None}
         if color_table is not None:         # a mapping, a Series or a DataFrame: {edge id as text: colour}

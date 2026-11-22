@@ -413,6 +413,8 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         from .levels_store import stored_levels
         g, level_kw = stored_levels(levels_db, g, kwargs.get("edge_id_col", "edge_id"))
         kwargs = {**kwargs, **level_kw}
+    from .render import vehicles_option
+    kwargs = vehicles_option(kwargs)
     lk, o = _look_and_options({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col,
                                "state": "live"})
     html = rust().page_from(_arrow(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings, lk, o["args"])))
