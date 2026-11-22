@@ -85,7 +85,7 @@ def test_the_run_plays_in_the_browser(tmp_path):
             # the lanes of net.xml under the vehicles, in the colours of each theme
             assert page.evaluate("map.getSource('vehicle-lanes').serialize().data.features.length") > 0
             fill = page.evaluate("map.getLayersOrder().find(k => k.startsWith('vehicle-lane-fill-'))")
-            col = f"JSON.stringify(map.getPaintProperty('{fill}', 'line-color'))"
+            col = f"JSON.stringify(map.getPaintProperty('{fill}', 'fill-color'))"
             light = page.evaluate(col)
             page.evaluate("rsSetTheme('dark')")
             assert page.evaluate(col) != light

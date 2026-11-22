@@ -22,6 +22,22 @@ fn mercator(lon: f64, lat: f64) -> [f64; 2] {
     [(lon + 180.0) / 360.0, 0.5 - (PI / 4.0 + lat.to_radians() / 2.0).tan().ln() / (2.0 * PI)]
 }
 
+/// The polygon of a band `half` metres to each side of the line `pts`: its right side, then its left side back.
+fn band(pts: &[[f64; 2]], half: f64) -> Vec<[f64; 2]> {
+    let mut ring = offset_line(pts, half);
+    ring.extend(offset_line(pts, -half).into_iter().rev());
+    ring.push(ring[0]);
+    ring
+}
+
+/// The part of `l` from s0 to s1 metres.
+fn part(l: &roadstyle_sim::Line, s0: f64, s1: f64) -> Vec<[f64; 2]> {
+    let mut pts = vec![l.at(s0).0];
+    pts.extend(l.pts.iter().zip(&l.cum).filter(|(_, &c)| c > s0 && c < s1).map(|(p, _)| *p));
+    pts.push(l.at(s1).0);
+    pts
+}
+
 /// The junction of an internal edge or lane id (`:<junction>_<n>` or `:<junction>_<n>_<m>`): the text before the last `_`.
 fn junction_of(edge: &str) -> &str {
     edge.trim_start_matches(':').rsplit_once('_').map_or(edge, |(j, _)| j)
@@ -184,14 +200,23 @@ impl VehicleScene {
         Ok(())
     }
 
-    /// The lanes and the junctions of the run's net.xml as a GeoJSON FeatureCollection, the surface that the vehicles drive on: first
-    /// a Polygon for each junction's area (`kind` "junction", `id`, `level`, `tunnel`), then a LineString in lon/lat (the lane's middle) for each lane
-    /// (`kind` "lane", `id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction), then the road marks of the
-    /// lanes that are not internal: `lane_line` (between two lanes of one edge, dashed), `stop` (across a lane at its end) and `arrow` (a point 4 m before a lane's end: `dirs`, the directions of its
-    /// connections, l r s t only, and `angle`, the lane's heading there), `ring_lane` (a lane inside a junction that goes on along a
-    /// roundabout's ring, `w`: it gets the casing of the ring's sides) and `zebra`. Every feature has `level` and `tunnel`. The sides
-    /// of a road are the casing of its lanes, drawn by the page. Empty with no net.xml.
-    pub fn lanes(&self) -> String {
+    /// lanes(json): the lanes and the junctions of the run's net.xml as a GeoJSON FeatureCollection, the surface that the vehicles drive
+    /// on. `json`: {marking_m, stop_m}, the width of a mark line and of a stop line (the look's vehicles.lanes). The surfaces and the
+    /// marks are polygons in metres (exact at every zoom and pitch; a line in pixels is not):
+    /// - `junction`: each junction's area (`id`, `through`: the road only passes through);
+    /// - `lane`: the lane's middle as a LineString (`id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction);
+    /// - `lane_area`: a lane of an edge (or of a roundabout's ring inside a junction) at its whole width, 0.1 m wider (no seam to its
+    ///   neighbour): drawn in the mark colour, its sides are the road's side lines;
+    /// - `lane_core`: the lane's surface on it, narrower by a mark on each side (inside a junction: the whole width);
+    /// - `lane_gap`: a strip in the surface colour over the side lines between two lanes of one edge, and `lane_line`, the dashed line
+    ///   there (a LineString);
+    /// - `stop` (the last stop_m metres of a lane, across it), `zebra` (one stripe), `arrow` (a point 4 m before a lane's end: `dirs`,
+    ///   the directions of its connections, l r s t only, and `angle`, the lane's heading there).
+    ///
+    /// Every feature has `level` and `tunnel`. Empty with no net.xml.
+    pub fn lanes(&self, json: &str) -> Result<String, JsError> {
+        let o: Value = serde_json::from_str(json).map_err(|e| JsError::new(&format!("VehicleScene.lanes: not JSON: {e}")))?;
+        let (mm, stop_m) = (opt_f64(&o, "marking_m")?, opt_f64(&o, "stop_m")?);
         let r7 = |p: &[f64; 2]| [(p[0] * 1e7).round() / 1e7, (p[1] * 1e7).round() / 1e7];
         let feats: Vec<Value> = self.run.net.as_ref().map_or(Vec::new(), |n| {
             let junctions = n.junctions.iter().map(|j| {
@@ -228,15 +253,16 @@ impl VehicleScene {
                     json!({"type": "Feature", "properties": {"kind": "lane", "id": l.id, "w": l.width, "internal": l.internal, "level": lv, "tunnel": tun > 0.0},
                            "geometry": {"type": "LineString", "coordinates": c}})
                 }))
-                .chain(self.marks(n, &look, r7))
+                .chain(self.marks(n, &look, r7, mm, stop_m))
                 .collect()
         });
-        json!({"type": "FeatureCollection", "features": feats}).to_string()
+        Ok(json!({"type": "FeatureCollection", "features": feats}).to_string())
     }
 
     /// The road marks of the lanes that are not internal, and the zebras (see `lanes`).
-    fn marks(&self, n: &roadstyle_sim::Net, look: &dyn Fn(usize) -> [f32; 2], r7: impl Fn(&[f64; 2]) -> [f64; 2]) -> Vec<Value> {
+    fn marks(&self, n: &roadstyle_sim::Net, look: &dyn Fn(usize) -> [f32; 2], r7: impl Fn(&[f64; 2]) -> [f64; 2], mm: f64, stop_m: f64) -> Vec<Value> {
         let line = |pts: Vec<[f64; 2]>| json!({"type": "LineString", "coordinates": pts.iter().map(&r7).collect::<Vec<_>>()});
+        let poly = |pts: Vec<[f64; 2]>| json!({"type": "Polygon", "coordinates": [pts.iter().map(&r7).collect::<Vec<_>>()]});
         let feat = |kind: &str, i: usize, geom: Value, extra: Value| {
             let [lv, tun] = look(i);
             let mut p = json!({"kind": kind, "level": lv, "tunnel": tun > 0.0});
@@ -277,8 +303,16 @@ impl VehicleScene {
             };
             let mut y = -l.width / 2.0 + 0.25;
             while y <= l.width / 2.0 - 0.25 + 1e-9 {
-                out.push(feat("zebra", i, line(offset_line(&pts, y)), json!({})));
+                out.push(feat("zebra", i, poly(band(&offset_line(&pts, y), 0.25)), json!({})));
                 y += 1.0;
+            }
+        }
+        // every lane's surface: a lane of an edge narrower by its two side marks, a lane inside a junction at its whole width
+        for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| l.line.pts.len() > 1) {
+            let half = (l.width + 0.1) / 2.0 - if l.internal { 0.0 } else { mm };
+            out.push(feat("lane_core", i, poly(band(&l.line.pts, half)), json!({})));
+            if !l.internal {
+                out.push(feat("lane_area", i, poly(band(&l.line.pts, (l.width + 0.1) / 2.0)), json!({})));
             }
         }
         // a roundabout's ring: its lanes inside the junctions get the ring's lines too, so the ring's marks are one unbroken ring
@@ -291,10 +325,13 @@ impl VehicleScene {
                 continue;
             }
             if a.index > 0 {
-                out.push(feat("lane_line", j, line(offset_line(&l.line.pts, l.width / 2.0)), json!({})));
+                let side = offset_line(&l.line.pts, l.width / 2.0);
+                out.push(feat("lane_gap", j, poly(band(&side, mm + 0.025)), json!({})));
+                out.push(feat("lane_line", j, line(side), json!({})));
             }
-            // the ring's sides: its lanes inside the junctions get the casing too (`ring`)
-            out.push(feat("ring_lane", i, line(l.line.pts.clone()), json!({"w": l.width})));
+            // the ring's sides: its lanes inside the junctions get the side lines too, with a surface narrower by them
+            out.push(feat("lane_area", i, poly(band(&l.line.pts, (l.width + 0.1) / 2.0)), json!({})));
+            out.push(feat("lane_core", i, poly(band(&l.line.pts, (l.width + 0.1) / 2.0 - mm)), json!({})));
         }
         let mut edges: Vec<_> = by_edge.into_iter().collect();
         edges.sort_by(|a, b| a.0.cmp(b.0));
@@ -303,16 +340,18 @@ impl VehicleScene {
             let last = lanes.len() - 1;
             for (k, &i) in lanes.iter().enumerate() {
                 let l = &n.lanes[i];
-                let (right, left) = (offset_line(&l.line.pts, l.width / 2.0), offset_line(&l.line.pts, -l.width / 2.0));
+                let left = offset_line(&l.line.pts, -l.width / 2.0);
                 // the sides of a road are the casing of its lanes (the page draws it under all lane surfaces, so a side line does not
                 // cross another edge's lanes); only the lines between two lanes of one edge are marks of their own
                 if k != last {
+                    out.push(feat("lane_gap", i, poly(band(&left, mm + 0.025)), json!({})));
                     out.push(feat("lane_line", i, line(left.clone()), json!({})));
                 }
                 // a stop line only where SUMO can make a vehicle stop or give way, never on a roundabout's ring or where the road only
                 // passes through a junction
                 if l.stops && !l.ring && !end_junction(n, i).is_some_and(|j| through.contains(&j)) {
-                    out.push(feat("stop", i, line(vec![*left.last().unwrap(), *right.last().unwrap()]), json!({})));
+                    let len = l.line.len();
+                    out.push(feat("stop", i, poly(band(&part(&l.line, (len - stop_m).max(0.0), len), l.width / 2.0)), json!({})));
                 }
                 // turn arrows only where the lane's end has more than one way out, off a ring, and with room (15 m)
                 let dirs: String = ['l', 's', 'r', 't'].iter().filter(|&&c| l.dirs.contains(c) || l.dirs.contains(c.to_ascii_uppercase())).collect();

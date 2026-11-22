@@ -16,8 +16,8 @@
 // classes, and two ground roads of a junction can differ in it. Each level has its own layers, from the lowest up: the junctions, the lane markings, the lanes,
 // then the vehicles of that level. So a bridge's lanes cover the vehicles under the bridge, and its vehicles are on top.
 // THE TUNNELS: a lane, a mark and a vehicle on a tunnel road fade as much as the page's tunnel roads: their colours move toward the
-// map's background colour (the background layer, in each theme) by 1 - (1 - the tunnel strength of tunnel.js)^2 (84 % at the default
-// 60 %: a faint ghost, sides and all), times the tunnels' fade with the terrain on (rs_terrain_tunnel, elevation.js). The colours are
+// map's background colour (the background layer, in each theme) by 0.8 x the tunnel strength of tunnel.js (48 % at the default 60 %: a
+// mid tone, apart from the open roads and from the buildings), times the tunnels' fade with the terrain on (rs_terrain_tunnel, elevation.js). The colours are
 // opaque, so two pieces that overlap do not get darker.
 // THE PAGE'S ROADS: where the lanes draw a road (its edge is in net.xml), the page does not draw it itself (rsHideRoads; its name stays).
 // P1: flat ground (z 0), boxes, no camera.
@@ -184,10 +184,12 @@ function _vhTunnelHex(hex){
   const a = _vhRgba(hex, "lane"), b = _vhRgba(_vhBg(), "background"), k = _vhTunnelOpacity();
   return "#" + [0, 1, 2].map(i => Math.round((b[i] + (a[i] - b[i]) * k) * 255).toString(16).padStart(2, "0")).join("");
 }
-// how much of its colour a lane or a vehicle on a tunnel road keeps: (1 - the tunnel strength)^2 (tunnel.js; strength 0 when the page has
+// how much of its colour a lane or a vehicle on a tunnel road keeps: 1 - 0.8 x the tunnel strength (tunnel.js; strength 0 when the page has
 // no tunnel look), times the tunnels' fade with the terrain on (elevation.js sets rs_terrain_tunnel)
 function _vhTunnelOpacity(){
-  const k = (1 - (TUNNEL && TUNNEL.strength != null ? +TUNNEL.strength : 0) / 100) ** 2;
+  // 1 - 0.8 x strength (0.52 at the default 60 %): a tunnel road stays a road, a mid tone between the open road and the land; the square
+  // of (1 - strength), 0.16, made it as pale as a building
+  const k = 1 - 0.8 * (TUNNEL && TUNNEL.strength != null ? +TUNNEL.strength : 0) / 100;
   let f = 1; try { const v = map.getGlobalState().rs_terrain_tunnel; if(v != null) f = +v; } catch(e){ /* a map with no global state */ }
   return k * f;
 }
@@ -225,9 +227,9 @@ function _vhLanePaint(){
   const set = (id, kind, col) => { if(map.getLayer(id)) map.setPaintProperty(id, `${kind}-color`, ["case", ["get", "tunnel"], _vhTunnelHex(col), col]); };
   for(const lv of _vhLevels){
     const id = _vhIdsOf(lv);
-    set(id["vehicle-junctions"], "fill", fill); set(id["vehicle-junction-edges"], "line", fill); set(id["vehicle-lane-fill"], "line", fill);
-    set(id["vehicle-lane-gaps"], "line", fill);
-    for(const k of ["vehicle-lane-casing", "vehicle-lane-lines", "vehicle-stop-lines", "vehicle-zebras"]) set(id[k], "line", mark);
+    set(id["vehicle-junctions"], "fill", fill); set(id["vehicle-junction-edges"], "line", fill); set(id["vehicle-lane-fill"], "fill", fill);
+    set(id["vehicle-lane-gaps"], "fill", fill); set(id["vehicle-lane-lines"], "line", mark);
+    for(const k of ["vehicle-lane-casing", "vehicle-stop-lines", "vehicle-zebras"]) set(id[k], "fill", mark);
     set(id["vehicle-turn-arrows"], "icon", mark);
   }
 }
@@ -275,28 +277,21 @@ function _vhAddLaneLayers(src){
   for(const lv of _vhLevels){
     const id = _vhIdsOf(lv), at = ["==", ["get", "level"], lv], of = (kind) => ["all", at, ["==", ["get", "kind"], kind]];
     const veh = map.getLayer(id.vehicles) ? id.vehicles : undefined;
-    // the sides of a road: each lane in the marking colour at its whole width, under every surface of the level; the surface on it is
-    // narrower by a marking on each side (vehicle-lane-fill). So a white line runs inside the sides of the lanes; where another edge's
-    // lanes overlap, their surface covers it (it does not cross them); between two lanes of one edge vehicle-lane-gaps covers it, and
-    // the dashed line goes on top; between the two directions of a road it stays: a double solid line
-    map.addLayer({id: id["vehicle-lane-casing"], type: "line", source: src, layout: butt,
-                  filter: ["all", at, ["any", ["all", ["==", ["get", "kind"], "lane"], ["!", ["get", "internal"]]], ["==", ["get", "kind"], "ring_lane"]]],
-                  paint: {"line-width": _vhPx(["+", ["get", "w"], 0.1], lat)}}, veh);
+    // the sides of a road: each lane of an edge in the marking colour at its whole width (a polygon in metres, like every surface and
+    // mark here: exact at every zoom and pitch), under every surface of the level; the surface on it is narrower by a mark on each side.
+    // So a white line runs inside the sides of the lanes; where another edge's lanes overlap, their surface covers it; between two lanes
+    // of one edge vehicle-lane-gaps covers it, and the dashed line goes on top; between the two directions it stays: a double line
+    map.addLayer({id: id["vehicle-lane-casing"], type: "fill", source: src, filter: of("lane_area")}, veh);
     map.addLayer({id: id["vehicle-junctions"], type: "fill", source: src, filter: of("junction")}, veh);
     // no outline where the road only passes through (it would stick out at the road's sides)
     map.addLayer({id: id["vehicle-junction-edges"], type: "line", source: src, filter: of("junction"), layout: round,
                   paint: {"line-width": _vhPx(["case", ["get", "through"], _VH_SEAM_THROUGH_M, _VH_SEAM_M], lat)}}, veh);
-    // a lane inside a junction is a little wider than it is (no seam to its neighbour); a lane of an edge narrower by its two side marks
-    map.addLayer({id: id["vehicle-lane-fill"], type: "line", source: src, filter: of("lane"), layout: butt,
-                  paint: {"line-width": _vhPx(["case", ["get", "internal"], ["+", ["get", "w"], 0.1], ["+", ["get", "w"], 0.1 - 2 * mm]], lat)}}, veh);
-    map.addLayer({id: id["vehicle-lane-gaps"], type: "line", source: src, filter: of("lane_line"), layout: butt,
-                  paint: {"line-width": _vhPx(2 * mm + 0.05, lat)}}, veh);
+    map.addLayer({id: id["vehicle-lane-fill"], type: "fill", source: src, filter: of("lane_core")}, veh);
+    map.addLayer({id: id["vehicle-lane-gaps"], type: "fill", source: src, filter: of("lane_gap")}, veh);
     map.addLayer({id: id["vehicle-lane-lines"], type: "line", source: src, filter: of("lane_line"), layout: butt,
                   paint: {"line-width": _vhPx(mm, lat), "line-dasharray": [L.dash_m[0] / mm, L.dash_m[1] / mm]}}, veh);
-    map.addLayer({id: id["vehicle-stop-lines"], type: "line", source: src, filter: of("stop"), layout: butt,
-                  paint: {"line-width": _vhPx(L.stop_m, lat)}}, veh);
-    map.addLayer({id: id["vehicle-zebras"], type: "line", source: src, filter: of("zebra"), layout: butt,
-                  paint: {"line-width": _vhPx(0.5, lat)}}, veh);
+    map.addLayer({id: id["vehicle-stop-lines"], type: "fill", source: src, filter: of("stop")}, veh);
+    map.addLayer({id: id["vehicle-zebras"], type: "fill", source: src, filter: of("zebra")}, veh);
     map.addLayer({id: id["vehicle-turn-arrows"], type: "symbol", source: src, filter: of("arrow"),
                   layout: {"icon-image": ["concat", `${RS_PREFIX}rs-turn-`, ["get", "dirs"]], "icon-rotate": ["get", "angle"],
                            "icon-rotation-alignment": "map", "icon-pitch-alignment": "map", "icon-allow-overlap": true,
@@ -388,7 +383,9 @@ async function _vhLoad(o){
   const edges = await _vhEdges();
   scene.setEdges(JSON.stringify(edges));
   scene.setCrossings(JSON.stringify((o.crossings || []).map(String)));
-  _vhLanes = o.lanes === false ? null : JSON.parse(scene.lanes());
+  const L = O.vehicle_look && O.vehicle_look.lanes;
+  if(o.lanes !== false && !L) throw new Error("rs.vehicles: the look has no vehicles.lanes (the palette's colours, the profile's numbers)");
+  _vhLanes = o.lanes === false ? null : JSON.parse(scene.lanes(JSON.stringify({marking_m: L.marking_m, stop_m: L.stop_m})));
   // the page's own drawing of the roads that the lanes draw
   if(_vhLanes){
     const inNet = new Set(_vhLanes.features.filter(f => f.properties.kind === "lane" && !f.properties.internal).map(f => f.properties.id.replace(/_\d+$/, "")));
