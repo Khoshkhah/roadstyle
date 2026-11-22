@@ -66,3 +66,24 @@ def test_the_run_plays_in_the_browser(tmp_path):
         finally:
             browser.close()
     assert errors == []
+
+
+def test_duckosm_page_takes_the_run_too(tmp_path):
+    """duckosm.page (the page of duckOSM's net.map) puts the run's local files into the page, as render_edges does."""
+    from test_duckosm import _tiny
+
+    from roadstyle import duckosm
+    db = _tiny(tmp_path / "t.duckdb")
+    v = _opt(duckosm.page(db, "driving", levels="tags", vehicles={"wasm": "./pkg/roadstyle_wasm.js", "fcd": FCD, "net": NET}).html, "vehicles")
+    assert v["fcd"].startswith("data:application/vnd.apache.parquet;base64,") and v["net"].startswith("<")
+
+
+@built
+def test_duckosm_page_gets_the_module_and_the_play_bar(tmp_path):
+    from test_duckosm import _tiny
+
+    from roadstyle import duckosm
+    html = duckosm.page(_tiny(tmp_path / "t.duckdb"), "driving", levels="tags", vehicles={"fcd": FCD, "net": NET}).html
+    v = _opt(html, "vehicles")
+    assert v["wasm"].startswith("data:text/javascript;base64,") and v["wasm_bin"].startswith("data:application/gzip;base64,")
+    assert 'data-a="play"' in html

@@ -161,6 +161,7 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
     ``template``, ...). Gives a ``WebMap`` (``.save(path)``)."""
     from . import render_web as rw
     from ._engine import _warn, page_given, rust
+    from .render import vehicles_option
 
     if kwargs.get("planner"):
         raise ValueError("duckosm.page has no route planner yet: use mapstyle's render_map(planner=True)")
@@ -179,6 +180,7 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
         kw = {"template": "dashboard", "dashboard": {"panel": None}, **kw}
     if "ground" not in kw:
         kw["ground"] = ground(db)                    # the area's own ground when the file has one (the standard "The ground reference")
+    kw = vehicles_option(kw)                         # a SUMO run: its local files, roadstyle's vehicles module and the play bar
     o = _options(db, mode, theme, paths, level_kw, kw)
     lk = rust().resolve_look(json.dumps(o))
     # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
