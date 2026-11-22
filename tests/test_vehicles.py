@@ -48,6 +48,25 @@ def test_the_page_gets_the_module_and_the_play_bar():
     assert html.index('data-a="play"') < html.index("window.mine = 1;")
 
 
+# the vertices of the lanes in view that the drawn tiles do not have, at zoom z (a tile keeps a vertex on a grid of 1/4096 of the tile:
+# a data vertex counts as drawn when a tile vertex is within 2 steps of it)
+_SAME_SHAPE = """(z) => new Promise(r => {
+  const lanes = map.getSource('vehicle-lanes').serialize().data.features.filter(f => f.properties.kind === 'lane');
+  const c0 = lanes[0].geometry.coordinates[0];
+  map.jumpTo({center: c0, zoom: z, pitch: 0, bearing: 0});
+  map.once('idle', () => {
+    const q = 360 / 2 ** Math.min(Math.floor(z), 18) / 4096, cell = (c) => [Math.floor(c[0] / q), Math.floor(c[1] / q)];
+    const b = map.getBounds(), drawn = new Set();
+    for(const f of map.querySourceFeatures('vehicle-lanes', {filter: ['==', ['get', 'kind'], 'lane']}))
+      (f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.coordinates).forEach(l => l.forEach(c => drawn.add(cell(c).join())));
+    let lost = 0;
+    for(const f of lanes) for(const c of f.geometry.coordinates) if(b.contains(c)){
+      const [x, y] = cell(c); let ok = false;
+      for(let dx = -2; dx <= 2 && !ok; dx++) for(let dy = -2; dy <= 2 && !ok; dy++) ok = drawn.has((x + dx) + ',' + (y + dy));
+      if(!ok) lost++; }
+    r(lost); }); })"""
+
+
 @built
 def test_the_run_plays_in_the_browser(tmp_path):
     pw = pytest.importorskip("playwright.sync_api")
@@ -70,6 +89,10 @@ def test_the_run_plays_in_the_browser(tmp_path):
             light = page.evaluate(col)
             page.evaluate("rsSetTheme('dark')")
             assert page.evaluate(col) != light
+            # the same lanes at two zooms: every vertex of the data in view is drawn (MapLibre simplified a GeoJSON source at each zoom,
+            # so a lane had another shape at another zoom)
+            for z in (15.5, 19.0):
+                assert page.evaluate(_SAME_SHAPE, z) == 0, f"lane vertices not drawn at zoom {z}"
         finally:
             browser.close()
     assert errors == []

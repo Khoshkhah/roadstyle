@@ -248,7 +248,9 @@ function _vhAddLaneLayers(src){
   const L = O.vehicle_look && O.vehicle_look.lanes;
   if(!L) throw new Error("rs.vehicles: the look has no vehicles.lanes (the palette's colours, the profile's numbers)");
   const lat = _vhOrigin[1], mm = L.marking_m, butt = {"line-cap": "butt", "line-join": "round"}, round = {"line-cap": "round", "line-join": "round"};
-  if(!map.getSource(src)) map.addSource(src, {type: "geojson", data: _vhLanes});
+  // tolerance 0: MapLibre simplifies a GeoJSON source at each zoom by default, so a lane had another shape at another zoom (a vertex
+  // dropped, a step in its side). buffer 512 (a whole tile): a lane is wide in metres, and a small buffer cut it near the tile's edge
+  if(!map.getSource(src)) map.addSource(src, {type: "geojson", data: _vhLanes, tolerance: 0, buffer: 512});
   for(const d of new Set(_vhLanes.features.filter(f => f.properties.kind === "arrow").map(f => f.properties.dirs))){
     const name = `${RS_PREFIX}rs-turn-${d}`;
     if(!map.hasImage(name)) map.addImage(name, _vhArrowIcon(d), {sdf: true});
