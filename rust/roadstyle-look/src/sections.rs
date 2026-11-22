@@ -480,6 +480,22 @@ pub struct VehiclesLook {
     pub lane_change_s: Num,
     /// the heading is the road's direction this far ahead of the vehicle's middle, m
     pub heading_lookahead_m: Num,
+    /// the lanes of the run's net.xml under the vehicles
+    pub lanes: VehicleLanesLook,
+}
+
+/// The lanes of a run under its vehicles (SUMO's lanes, from net.xml, at their width in metres): the palette's colours, the profile's
+/// marking width.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct VehicleLanesLook {
+    /// the surface of a lane
+    pub fill: ThemeColor,
+    /// the line between two lanes and at the edge of a road
+    pub marking: ThemeColor,
+    /// the width of a marking, m (half of it on each lane)
+    pub marking_m: Num,
 }
 
 /// One SUMO vClass: its kind (a key of `VehiclesLook::colours`) and its default size [length, width, height] in m.

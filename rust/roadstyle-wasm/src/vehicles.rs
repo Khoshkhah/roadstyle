@@ -122,6 +122,32 @@ impl VehicleScene {
         .to_string()
     }
 
+    /// The lanes and the junctions of the run's net.xml as a GeoJSON FeatureCollection, the surface that the vehicles drive on: first
+    /// a Polygon for each junction's area (`kind` "junction", `id`), then a LineString in lon/lat (the lane's middle) for each lane
+    /// (`kind` "lane", `id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction). Empty with no net.xml.
+    pub fn lanes(&self) -> String {
+        let r7 = |p: &[f64; 2]| [(p[0] * 1e7).round() / 1e7, (p[1] * 1e7).round() / 1e7];
+        let feats: Vec<Value> = self.run.net.as_ref().map_or(Vec::new(), |n| {
+            let junctions = n.junctions.iter().map(|j| {
+                let mut ring: Vec<[f64; 2]> = j.shape.iter().map(r7).collect();
+                if ring.first() != ring.last() {
+                    ring.push(ring[0]);
+                }
+                json!({"type": "Feature", "properties": {"kind": "junction", "id": j.id}, "geometry": {"type": "Polygon", "coordinates": [ring]}})
+            });
+            junctions.chain(n.lanes
+                .iter()
+                .filter(|l| l.line.pts.len() > 1)
+                .map(|l| {
+                    let c: Vec<[f64; 2]> = l.line.pts.iter().map(r7).collect();
+                    json!({"type": "Feature", "properties": {"kind": "lane", "id": l.id, "w": l.width, "internal": l.internal},
+                           "geometry": {"type": "LineString", "coordinates": c}})
+                }))
+                .collect()
+        });
+        json!({"type": "FeatureCollection", "features": feats}).to_string()
+    }
+
     /// Every vehicle on the network at clock time `t` (seconds of the run), STRIDE numbers each.
     pub fn frame(&self, t: f64) -> Vec<f32> {
         let states = self.run.at(t);

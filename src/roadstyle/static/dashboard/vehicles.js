@@ -8,6 +8,9 @@
 // page adds layers later (the 3D switch, a base map change), so the layer goes to the top again on each style change.
 // THE LOOK: the colours (one for each kind, light and dark), the kind and the size of each SUMO vClass and the numbers of a run come
 // from the look's vehicles section (O.vehicle_look: the palette and the profile); a page can give its own in load().
+// THE LANES: the junction areas and the lanes of the run's net.xml (VehicleScene.lanes, the surface that the vehicles drive on), under the
+// vehicles: the junctions' polygons in the lane colour, then each lane at its width in metres, a marking line at the full width and the
+// surface on it less the marking. A lane inside a junction has no marking.
 // P1: flat ground (z 0), boxes, no camera.
 import {map, O, RS_PREFIX, _emit} from "./core.js";
 
@@ -15,6 +18,9 @@ const _VH_STRIDE = 16;                 // the numbers of one vehicle in VehicleS
 const _VH_MAX_CLASSES = 8;             // the colours the shader holds (a class number past it takes colour number % 8)
 const _VH_KEYS = ["placement", "teleport_m", "lane_change_s", "heading_lookahead_m", "class_sizes"];
 const _vhLayerId = () => RS_PREFIX + "vehicles";
+const _vhLaneIds = () => [RS_PREFIX + "vehicle-lane-marking", RS_PREFIX + "vehicle-lane-fill", RS_PREFIX + "vehicle-junctions"];
+const _VH_M_PX = 40075016.686 / 512;   // the metres of one pixel at zoom 0 at the equator (MapLibre's 512 px tiles)
+let _vhLanes = null, _vhLanesIn = null; // the lanes' GeoJSON (null: the page shows no lanes), and the GeoJSON in the source now
 
 let _vhScene = null, _vhOrigin = null, _vhColours = null, _vhReport = null, _vhIds = null, _vhClasses = [], _vhGiven = null;
 let _vhT = 0, _vhSpeed = 1, _vhPlaying = false, _vhWall = null, _vhSentAt = 0, _vhDirty = true;
@@ -125,8 +131,42 @@ const _vhLayer = {
 function _vhOnTop(){
   const id = _vhLayerId();
   if(!map.getLayer(id)) return;
+  _vhAddLanes();
   const order = map.getLayersOrder();
   if(order[order.length - 1] !== id) map.moveLayer(id);
+}
+
+// a width in metres (`m`: a number or an expression) as pixels at each zoom, at the latitude `lat`
+function _vhPx(m, lat){
+  const k = 1 / (_VH_M_PX * Math.cos(lat * Math.PI / 180));
+  return ["interpolate", ["exponential", 2], ["zoom"], 10, ["*", m, k * 2 ** 10], 24, ["*", m, k * 2 ** 24]];
+}
+
+// the lane layers: their colours in the theme
+function _vhLanePaint(){
+  const l = O.vehicle_look.lanes, [mk, fl, jn] = _vhLaneIds();
+  if(map.getLayer(jn)) map.setPaintProperty(jn, "fill-color", _vhDark() ? l.fill.dark : l.fill.light);
+  if(map.getLayer(mk)) map.setPaintProperty(mk, "line-color", _vhDark() ? l.marking.dark : l.marking.light);
+  if(map.getLayer(fl)) map.setPaintProperty(fl, "line-color", _vhDark() ? l.fill.dark : l.fill.light);
+}
+
+// the lane source and layers, under the vehicle layer (again after a style change that removed them)
+function _vhAddLanes(){
+  const src = RS_PREFIX + "vehicle-lanes";
+  if(!_vhLanes) return;
+  if(map.getSource(src) && _vhLanesIn !== _vhLanes) map.getSource(src).setData(_vhLanes);     // a second run
+  _vhLanesIn = _vhLanes;
+  if(map.getLayer(_vhLaneIds()[1])) return;
+  if(!O.vehicle_look || !O.vehicle_look.lanes) throw new Error("rs.vehicles: the look has no vehicles.lanes (the palette's colours, the profile's marking_m)");
+  const lat = _vhOrigin[1], mm = O.vehicle_look.lanes.marking_m, [mk, fl, jn] = _vhLaneIds();
+  if(!map.getSource(src)) map.addSource(src, {type: "geojson", data: _vhLanes});
+  const before = map.getLayer(_vhLayerId()) ? _vhLayerId() : undefined, round = {"line-cap": "butt", "line-join": "round"};
+  const lane = ["==", ["get", "kind"], "lane"];
+  map.addLayer({id: jn, type: "fill", source: src, filter: ["==", ["get", "kind"], "junction"]}, before);
+  map.addLayer({id: mk, type: "line", source: src, filter: ["all", lane, ["!", ["get", "internal"]]], layout: round, paint: {"line-width": _vhPx(["get", "w"], lat)}}, before);
+  map.addLayer({id: fl, type: "line", source: src, filter: lane, layout: round,
+                paint: {"line-width": _vhPx(["case", ["get", "internal"], ["get", "w"], ["-", ["get", "w"], mm]], lat)}}, before);
+  _vhLanePaint();
 }
 
 // "#rrggbb" or [r, g, b, a] (0..1) to [r, g, b, a]
@@ -177,11 +217,11 @@ async function _vhWasm(x){
 }
 async function _vhText(x){ return x == null ? undefined : (/^\s*</.test(x) ? x : await (await fetch(x)).text()); }
 
-// load({wasm, wasm_bin?, fcd, net, routes, options?, colours?}): `wasm` the URL of roadstyle_wasm.js built with the feature "vehicles";
+// load({wasm, wasm_bin?, fcd, net, routes, lanes?, options?, colours?}): `wasm` the URL of roadstyle_wasm.js built with the feature "vehicles";
 // `wasm_bin` (optional) the bytes or the URL of its roadstyle_wasm_bg.wasm, or of that file in gzip (needed when `wasm` is a data: URL, which has no folder); `fcd` the
 // bytes or the URL of SUMO's FCD Parquet file; `net` the text or the URL of the run's net.xml; `routes` (optional) the text or URL of
 // a file with the <vType> elements. `options` (every key of _VH_KEYS) and `colours` ({class: "#rrggbb"}) default to the look's vehicles
-// section. Gives the run's report and sends rs:vehicleload. A page with the option `vehicles` calls it at start (index.js).
+// section. `lanes` (default true): draw the lanes of net.xml under the vehicles. Gives the run's report and sends rs:vehicleload. A page with the option `vehicles` calls it at start (index.js).
 async function _vhLoad(o){
   for(const k of ["wasm", "fcd"]) if(o[k] == null) throw new Error(`rs.vehicles.load: ${k} is missing`);
   if((o.options == null || o.colours == null) && !O.vehicle_look)
@@ -196,6 +236,7 @@ async function _vhLoad(o){
   _vhPaint();
   _vhScene = scene; _vhOrigin = scene.origin(); _vhIds = scene.ids();
   _vhReport = JSON.parse(scene.report());
+  _vhLanes = o.lanes === false ? null : JSON.parse(scene.lanes());
   _vhT = _vhReport.t0; _vhDirty = true; _vhPause();
   // the style can be busy after "load" (a theme or base map change of the page): wait for an "idle" with the style loaded, not for
   // "load", which fires once only
@@ -203,7 +244,7 @@ async function _vhLoad(o){
   _vhLayer.id = _vhLayerId();
   if(!map.getLayer(_vhLayer.id)){
     map.addLayer(_vhLayer); map.on("styledata", _vhOnTop);
-    document.addEventListener("rs:themechange", () => { if(_vhScene){ _vhPaint(); map.triggerRepaint(); } });
+    document.addEventListener("rs:themechange", () => { if(_vhScene){ _vhPaint(); if(_vhLanes) _vhLanePaint(); map.triggerRepaint(); } });
   }
   _vhOnTop();
   map.triggerRepaint();

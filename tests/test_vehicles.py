@@ -63,6 +63,12 @@ def test_the_run_plays_in_the_browser(tmp_path):
             page.click('[data-a="play"]')
             page.wait_for_function("rs.vehicles.time() > 46 && rs.vehicles.count() > 0", timeout=30_000)
             assert page.locator('[data-a="play"]').inner_text() == "Pause"
+            # the lanes of net.xml under the vehicles, in the colours of each theme
+            assert page.evaluate("map.getSource('vehicle-lanes').serialize().data.features.length") > 0
+            col = "map.getPaintProperty('vehicle-lane-fill', 'line-color')"
+            light = page.evaluate(col)
+            page.evaluate("rsSetTheme('dark')")
+            assert page.evaluate(col) != light
         finally:
             browser.close()
     assert errors == []

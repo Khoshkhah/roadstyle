@@ -134,6 +134,8 @@ vehicles:   # the vehicles of a traffic microsimulation run (docs/design/vehicle
   teleport_m: 50              # a jump longer than this between two samples (a SUMO teleport) is not interpolated: the vehicle is hidden between them
   lane_change_s: 2            # a lane change blends the places on the two lanes over this time, centred on the sample of the change
   heading_lookahead_m: 2      # the heading is the road's direction this far ahead of the vehicle's middle
+  lanes:                      # the lanes of the run under the vehicles (SUMO's lanes of net.xml, at their width); the palette's vehicles.lanes colour them
+    marking_m: 0.15           # the width of the marking between two lanes and at a road's edge, m (half of it on each lane)
   classes:                    # each SUMO vClass: its kind (a colour of the palette) and its default size [length, width, height] in m, SUMO's (Vehicle_Type_Parameter_Defaults, 2026-11-10); a vType's own size wins; a class that is not here is an error
     passenger: {kind: car, size: [5, 1.8, 1.5]}
     taxi: {kind: car, size: [5, 1.8, 1.5]}

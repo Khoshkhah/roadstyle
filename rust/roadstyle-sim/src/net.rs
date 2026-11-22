@@ -86,6 +86,15 @@ pub struct Net {
     pub by_id: HashMap<String, u32>,
     /// the lanes a vehicle can drive onto from each lane (through a junction's internal lane, or straight on)
     pub next: Vec<Vec<u32>>,
+    /// the area of each junction (its `shape`, lon/lat, at least 3 points): the surface that its internal lanes lie on
+    pub junctions: Vec<Junction>,
+}
+
+/// One junction of the network and its area.
+#[derive(Debug, Clone)]
+pub struct Junction {
+    pub id: String,
+    pub shape: Vec<[f64; 2]>,
 }
 
 fn pair(s: &str, what: &str) -> Result<[f64; 2], Error> {
@@ -106,6 +115,7 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
     let mut proj = None;
     let mut raw: Vec<RawLane> = Vec::new();
     let mut conns: Vec<(String, String)> = Vec::new();
+    let mut raw_junctions: Vec<(String, Vec<[f64; 2]>)> = Vec::new();
     let mut edge: Option<(String, bool)> = None;
     for t in tags(text) {
         match (t.name, t.closing) {
@@ -126,6 +136,14 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
                 let pts = shape.split_whitespace().map(|p| pair(p, "a shape point")).collect::<Result<Vec<_>, _>>()?;
                 // SUMO's default lane width is 3.2 m (netconvert --default.lanewidth)
                 raw.push((id.to_string(), e.clone(), *internal, num("index", 0.0) as i32, num("length", f64::NAN), num("width", 3.2), pts));
+            }
+            // an internal junction (a waiting place inside a junction) has no area of its own
+            ("junction", false) if t.get("type") != Some("internal") => {
+                let (Some(id), Some(shape)) = (t.get("id"), t.get("shape")) else { continue };
+                let pts = shape.split_whitespace().map(|p| pair(p, "a junction shape point")).collect::<Result<Vec<_>, _>>()?;
+                if pts.len() >= 3 {
+                    raw_junctions.push((id.to_string(), pts));
+                }
             }
             ("connection", false) => {
                 let (Some(from), Some(to)) = (t.get("from"), t.get("to")) else { continue };
@@ -158,6 +176,12 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
         by_id.insert(id.clone(), lanes.len() as u32);
         lanes.push(Lane { id, edge, internal, index, length, width, line });
     }
+    let mut junctions = Vec::with_capacity(raw_junctions.len());
+    for (id, pts) in raw_junctions {
+        let mut ll: Vec<[f64; 2]> = pts.iter().map(|p| [p[0] - net_offset[0], p[1] - net_offset[1]]).collect();
+        to_ll.line(&mut ll).map_err(|e| Error::Crs(e.to_string()))?;
+        junctions.push(Junction { id, shape: ll });
+    }
     let mut next = vec![Vec::new(); lanes.len()];
     for (a, b) in conns {
         if let (Some(&i), Some(&j)) = (by_id.get(&a), by_id.get(&b)) {
@@ -166,7 +190,7 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
             }
         }
     }
-    Ok(Net { net_offset, proj, lanes, by_id, next })
+    Ok(Net { net_offset, proj, lanes, by_id, next, junctions })
 }
 
 /// One `<vType>`: the values the file gives. A missing size is None (the run takes the default of its class).

@@ -8,6 +8,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 
+- **The lanes of a SUMO run under its vehicles.** A page with `vehicles=` draws the junction areas and each lane of the run's `net.xml` (each lane at its width in metres, with a marking between two lanes), so each vehicle is in its own lane, also inside a junction. All of it comes from SUMO, none from duckOSM. `"lanes": False` leaves them out. New look keys: the palettes' `vehicles.lanes` (`fill`, `marking`, light and dark) and the profile's `vehicles.lanes.marking_m`.
+
 - **A nightly wheel** (`.github/workflows/nightly.yml`): each merge to main that changes the package puts a Linux x86_64 wheel, with the vehicles module in it, in the GitHub pre-release `nightly`, in place of the old one. Its version is `<version>+nightly.<run>`. Nothing goes to PyPI. How to install it: `docs/get-started.md`.
 
 - **A SUMO run on a page from Python, with no build of your own** (`vehicles={"fcd": path, "net": path}`). A local file goes into the page: the FCD Parquet (`--fcd-output.geo true`) as a `data:` URL, `net.xml` and `routes` as their text. A URL stays a URL. With no `wasm`, the page gets roadstyle's vehicles module (in the package, about 5 MB in the page) and a play bar (play, pause, seek, speed). The release workflow builds the module (`rust/roadstyle-wasm/build_vehicles.sh`); in a source checkout, run that script. `rs.vehicles.load` takes `wasm_bin`, the bytes or the URL of the module's `.wasm` file (also in gzip). Test: `tests/test_vehicles.py` (the Monaco run of `roadstyle-sim`).

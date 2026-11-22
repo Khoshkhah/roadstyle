@@ -2436,6 +2436,10 @@
         "heading_lookahead_m": {
           "description": "the heading is the road's direction this far ahead of the vehicle's middle, m",
           "$ref": "#/$defs/Num"
+        },
+        "lanes": {
+          "description": "the lanes of the run's net.xml under the vehicles",
+          "$ref": "#/$defs/VehicleLanesLook"
         }
       },
       "additionalProperties": false,
@@ -2444,7 +2448,8 @@
         "classes",
         "teleport_m",
         "lane_change_s",
-        "heading_lookahead_m"
+        "heading_lookahead_m",
+        "lanes"
       ]
     },
     "VehicleClassLook": {
@@ -2467,6 +2472,30 @@
       "required": [
         "kind",
         "size"
+      ]
+    },
+    "VehicleLanesLook": {
+      "description": "The lanes of a run under its vehicles (SUMO's lanes, from net.xml, at their width in metres): the palette's colours, the profile's\nmarking width.",
+      "type": "object",
+      "properties": {
+        "fill": {
+          "description": "the surface of a lane",
+          "$ref": "#/$defs/ThemeColor"
+        },
+        "marking": {
+          "description": "the line between two lanes and at the edge of a road",
+          "$ref": "#/$defs/ThemeColor"
+        },
+        "marking_m": {
+          "description": "the width of a marking, m (half of it on each lane)",
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fill",
+        "marking",
+        "marking_m"
       ]
     },
     "BackgroundLook": {
