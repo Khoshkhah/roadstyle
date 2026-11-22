@@ -30,11 +30,12 @@ const _VH_MAX_CLASSES = 8;             // the colours the shader holds (a class 
 const _VH_KEYS = ["placement", "teleport_m", "lane_change_s", "heading_lookahead_m", "class_sizes"];
 // the layers of one level: the junctions, the lane markings, the lanes, the vehicles
 // the layers of one level, from the bottom up; the vehicles last
-const _VH_PARTS = ["vehicle-junctions", "vehicle-junction-edges", "vehicle-lane-fill", "vehicle-lane-edges", "vehicle-lane-lines",
+const _VH_PARTS = ["vehicle-lane-casing", "vehicle-junctions", "vehicle-junction-edges", "vehicle-lane-fill", "vehicle-lane-gaps", "vehicle-lane-lines",
                    "vehicle-stop-lines", "vehicle-zebras", "vehicle-turn-arrows", "vehicles"];
 const _vhIdsOf = (lv) => Object.fromEntries(_VH_PARTS.map(k => [k, `${RS_PREFIX}${k}-${lv}`]));
 const _vhVehId = (lv) => `${RS_PREFIX}vehicles-${lv}`;
 const _VH_SEAM_M = 1.0;                // the outline of a junction's area, m (round): it closes the seams and notches to its lanes and rounds its corners
+const _VH_SEAM_THROUGH_M = 0.4;        // the same where the road only passes through: thin, so it does not stick out at the road's sides
 const _VH_ARROW_PX = 96;               // the height of an arrow icon, px
 let _vhLevels = [0];                   // the levels of the run, from the lowest
 const _vhLayers = new Map();           // level -> its vehicle layer
@@ -195,8 +196,21 @@ function _vhTunnelOpacity(){
 function _vhOnTop(){
   if(!_vhScene || !map.getLayer(_vhVehId(_vhLevels[0]))) return;
   _vhAddLanes();
-  const want = _vhLevels.flatMap(lv => Object.values(_vhIdsOf(lv))).filter(id => map.getLayer(id)), order = map.getLayersOrder();
-  if(order.slice(-want.length).join() !== want.join()) want.forEach(id => map.moveLayer(id));
+  const order = map.getLayersOrder(), ours = new Set(_vhLevels.flatMap(lv => Object.values(_vhIdsOf(lv))));
+  // a 3D building layer that shows: the lanes go under it (a line layer does not test depth, so a lane above it was drawn over a building in
+  // front of it); the vehicles stay on top, where their depth test lets a building in front hide them. With no 3D buildings, the levels
+  // in order: each level's lanes, then its vehicles (a bridge's lanes cover the vehicles under it)
+  const ext = order.find(id => !ours.has(id) && map.getLayer(id).type === "fill-extrusion" && map.getLayoutProperty(id, "visibility") !== "none");
+  const lanes = _vhLevels.flatMap(lv => Object.values(_vhIdsOf(lv)).filter(id => id !== _vhVehId(lv))).filter(id => map.getLayer(id));
+  const vehs = _vhLevels.map(_vhVehId).filter(id => map.getLayer(id));
+  if(ext){
+    const want = [...lanes, ext], at = order.filter(id => want.includes(id));
+    if(at.join() !== want.join()) lanes.forEach(id => map.moveLayer(id, ext));
+    if(order.slice(-vehs.length).join() !== vehs.join()) vehs.forEach(id => map.moveLayer(id));
+  } else {
+    const want = _vhLevels.flatMap(lv => Object.values(_vhIdsOf(lv))).filter(id => map.getLayer(id));
+    if(order.slice(-want.length).join() !== want.join()) want.forEach(id => map.moveLayer(id));
+  }
 }
 
 // a width in metres (`m`: a number or an expression) as pixels at each zoom, at the latitude `lat`
@@ -212,7 +226,8 @@ function _vhLanePaint(){
   for(const lv of _vhLevels){
     const id = _vhIdsOf(lv);
     set(id["vehicle-junctions"], "fill", fill); set(id["vehicle-junction-edges"], "line", fill); set(id["vehicle-lane-fill"], "line", fill);
-    for(const k of ["vehicle-lane-edges", "vehicle-lane-lines", "vehicle-stop-lines", "vehicle-zebras"]) set(id[k], "line", mark);
+    set(id["vehicle-lane-gaps"], "line", fill);
+    for(const k of ["vehicle-lane-casing", "vehicle-lane-lines", "vehicle-stop-lines", "vehicle-zebras"]) set(id[k], "line", mark);
     set(id["vehicle-turn-arrows"], "icon", mark);
   }
 }
@@ -258,16 +273,24 @@ function _vhAddLaneLayers(src){
   const k = 1 / (_VH_M_PX * Math.cos(lat * Math.PI / 180));
   const arrowSize = ["interpolate", ["exponential", 2], ["zoom"], 10, L.arrow_m * k * 2 ** 10 / _VH_ARROW_PX, 24, L.arrow_m * k * 2 ** 24 / _VH_ARROW_PX];
   for(const lv of _vhLevels){
-    const id = _vhIdsOf(lv), veh = id.vehicles, at = ["==", ["get", "level"], lv], of = (kind) => ["all", at, ["==", ["get", "kind"], kind]];
+    const id = _vhIdsOf(lv), at = ["==", ["get", "level"], lv], of = (kind) => ["all", at, ["==", ["get", "kind"], kind]];
+    const veh = map.getLayer(id.vehicles) ? id.vehicles : undefined;
+    // the sides of a road: each lane in the marking colour at its whole width, under every surface of the level; the surface on it is
+    // narrower by a marking on each side (vehicle-lane-fill). So a white line runs inside the sides of the lanes; where another edge's
+    // lanes overlap, their surface covers it (it does not cross them); between two lanes of one edge vehicle-lane-gaps covers it, and
+    // the dashed line goes on top; between the two directions of a road it stays: a double solid line
+    map.addLayer({id: id["vehicle-lane-casing"], type: "line", source: src, layout: butt,
+                  filter: ["all", at, ["any", ["all", ["==", ["get", "kind"], "lane"], ["!", ["get", "internal"]]], ["==", ["get", "kind"], "ring_lane"]]],
+                  paint: {"line-width": _vhPx(["+", ["get", "w"], 0.1], lat)}}, veh);
     map.addLayer({id: id["vehicle-junctions"], type: "fill", source: src, filter: of("junction")}, veh);
     // no outline where the road only passes through (it would stick out at the road's sides)
-    map.addLayer({id: id["vehicle-junction-edges"], type: "line", source: src, filter: ["all", of("junction"), ["!", ["get", "through"]]], layout: round,
-                  paint: {"line-width": _vhPx(_VH_SEAM_M, lat)}}, veh);
-    // each lane a little wider than it is: two lanes side by side overlap, with no seam between them
+    map.addLayer({id: id["vehicle-junction-edges"], type: "line", source: src, filter: of("junction"), layout: round,
+                  paint: {"line-width": _vhPx(["case", ["get", "through"], _VH_SEAM_THROUGH_M, _VH_SEAM_M], lat)}}, veh);
+    // a lane inside a junction is a little wider than it is (no seam to its neighbour); a lane of an edge narrower by its two side marks
     map.addLayer({id: id["vehicle-lane-fill"], type: "line", source: src, filter: of("lane"), layout: butt,
-                  paint: {"line-width": _vhPx(["+", ["get", "w"], 0.1], lat)}}, veh);
-    map.addLayer({id: id["vehicle-lane-edges"], type: "line", source: src, filter: of("edge_line"), layout: butt,
-                  paint: {"line-width": _vhPx(mm, lat)}}, veh);
+                  paint: {"line-width": _vhPx(["case", ["get", "internal"], ["+", ["get", "w"], 0.1], ["+", ["get", "w"], 0.1 - 2 * mm]], lat)}}, veh);
+    map.addLayer({id: id["vehicle-lane-gaps"], type: "line", source: src, filter: of("lane_line"), layout: butt,
+                  paint: {"line-width": _vhPx(2 * mm + 0.05, lat)}}, veh);
     map.addLayer({id: id["vehicle-lane-lines"], type: "line", source: src, filter: of("lane_line"), layout: butt,
                   paint: {"line-width": _vhPx(mm, lat), "line-dasharray": [L.dash_m[0] / mm, L.dash_m[1] / mm]}}, veh);
     map.addLayer({id: id["vehicle-stop-lines"], type: "line", source: src, filter: of("stop"), layout: butt,

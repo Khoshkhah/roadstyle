@@ -187,10 +187,10 @@ impl VehicleScene {
     /// The lanes and the junctions of the run's net.xml as a GeoJSON FeatureCollection, the surface that the vehicles drive on: first
     /// a Polygon for each junction's area (`kind` "junction", `id`, `level`, `tunnel`), then a LineString in lon/lat (the lane's middle) for each lane
     /// (`kind` "lane", `id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction), then the road marks of the
-    /// lanes that are not internal: `edge_line` (the outer sides of an edge's lanes, solid), `lane_line` (between two lanes of one
-    /// edge, dashed), `stop` (across a lane at its end) and `arrow` (a point 4 m before a lane's end: `dirs`, the directions of its
-    /// connections, l r s t only, and `angle`, the lane's heading there). Every feature has `level` and `tunnel`. Empty with no
-    /// net.xml.
+    /// lanes that are not internal: `lane_line` (between two lanes of one edge, dashed), `stop` (across a lane at its end) and `arrow` (a point 4 m before a lane's end: `dirs`, the directions of its
+    /// connections, l r s t only, and `angle`, the lane's heading there), `ring_lane` (a lane inside a junction that goes on along a
+    /// roundabout's ring, `w`: it gets the casing of the ring's sides) and `zebra`. Every feature has `level` and `tunnel`. The sides
+    /// of a road are the casing of its lanes, drawn by the page. Empty with no net.xml.
     pub fn lanes(&self) -> String {
         let r7 = |p: &[f64; 2]| [(p[0] * 1e7).round() / 1e7, (p[1] * 1e7).round() / 1e7];
         let feats: Vec<Value> = self.run.net.as_ref().map_or(Vec::new(), |n| {
@@ -290,11 +290,11 @@ impl VehicleScene {
             if !(a.ring && on) {
                 continue;
             }
-            let top = n.lanes.iter().filter(|x| x.edge == a.edge).map(|x| x.index).max().unwrap_or(0);
-            out.push(feat(if a.index == 0 { "edge_line" } else { "lane_line" }, j, line(offset_line(&l.line.pts, l.width / 2.0)), json!({})));
-            if a.index == top {
-                out.push(feat("edge_line", j, line(offset_line(&l.line.pts, -l.width / 2.0)), json!({})));
+            if a.index > 0 {
+                out.push(feat("lane_line", j, line(offset_line(&l.line.pts, l.width / 2.0)), json!({})));
             }
+            // the ring's sides: its lanes inside the junctions get the casing too (`ring`)
+            out.push(feat("ring_lane", i, line(l.line.pts.clone()), json!({"w": l.width})));
         }
         let mut edges: Vec<_> = by_edge.into_iter().collect();
         edges.sort_by(|a, b| a.0.cmp(b.0));
@@ -304,10 +304,11 @@ impl VehicleScene {
             for (k, &i) in lanes.iter().enumerate() {
                 let l = &n.lanes[i];
                 let (right, left) = (offset_line(&l.line.pts, l.width / 2.0), offset_line(&l.line.pts, -l.width / 2.0));
-                if k == 0 {
-                    out.push(feat("edge_line", i, line(right.clone()), json!({})));
+                // the sides of a road are the casing of its lanes (the page draws it under all lane surfaces, so a side line does not
+                // cross another edge's lanes); only the lines between two lanes of one edge are marks of their own
+                if k != last {
+                    out.push(feat("lane_line", i, line(left.clone()), json!({})));
                 }
-                out.push(feat(if k == last { "edge_line" } else { "lane_line" }, i, line(left.clone()), json!({})));
                 // a stop line only where SUMO can make a vehicle stop or give way, never on a roundabout's ring or where the road only
                 // passes through a junction
                 if l.stops && !l.ring && !end_junction(n, i).is_some_and(|j| through.contains(&j)) {
