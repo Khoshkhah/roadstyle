@@ -151,7 +151,7 @@ impl VehicleScene {
     }
 
     /// The lanes and the junctions of the run's net.xml as a GeoJSON FeatureCollection, the surface that the vehicles drive on: first
-    /// a Polygon for each junction's area (`kind` "junction", `id`), then a LineString in lon/lat (the lane's middle) for each lane
+    /// a Polygon for each junction's area (`kind` "junction", `id`, `level`, `tunnel`), then a LineString in lon/lat (the lane's middle) for each lane
     /// (`kind` "lane", `id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction). Empty with no net.xml.
     pub fn lanes(&self) -> String {
         let r7 = |p: &[f64; 2]| [(p[0] * 1e7).round() / 1e7, (p[1] * 1e7).round() / 1e7];
@@ -164,16 +164,17 @@ impl VehicleScene {
                 json!({"type": "Feature", "properties": {"kind": "junction", "id": j.id}, "geometry": {"type": "Polygon", "coordinates": [ring]}})
             });
             let look = |i: usize| self.net_look.get(i).copied().unwrap_or([0.0, 0.0]);
-            // a junction is at the lowest level of its lanes
-            let mut jlevel: HashMap<&str, f32> = HashMap::new();
+            // a junction is at the lowest level of its lanes, and in a tunnel when all its lanes are
+            let mut jlook: HashMap<&str, (f32, bool)> = HashMap::new();
             for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| l.internal) {
                 let j = l.edge.trim_start_matches(':').rsplit_once('_').map_or(l.edge.as_str(), |(j, _)| j);
-                let e = jlevel.entry(j).or_insert(f32::INFINITY);
-                *e = e.min(look(i)[0]);
+                let e = jlook.entry(j).or_insert((f32::INFINITY, true));
+                *e = (e.0.min(look(i)[0]), e.1 && look(i)[1] > 0.0);
             }
             let junctions = junctions.map(|mut f| {
-                let lv = jlevel.get(f["properties"]["id"].as_str().unwrap_or("")).copied().filter(|v| v.is_finite()).unwrap_or(0.0);
+                let (lv, tun) = jlook.get(f["properties"]["id"].as_str().unwrap_or("")).copied().filter(|v| v.0.is_finite()).unwrap_or((0.0, false));
                 f["properties"]["level"] = json!(lv);
+                f["properties"]["tunnel"] = json!(tun);
                 f
             });
             junctions.chain(n.lanes

@@ -14,9 +14,10 @@
 // THE LEVELS: each lane and each vehicle has the drawing level of its road (the page's `fill_level`, by the SUMO edge id = the road's
 // `edge_id`; VehicleScene.setEdges). Each level has its own layers, from the lowest up: the junctions, the lane markings, the lanes,
 // then the vehicles of that level. So a bridge's lanes cover the vehicles under the bridge, and its vehicles are on top.
-// THE TUNNELS: a lane and a vehicle on a tunnel road fade with the page's tunnel look: they are drawn partly see-through (opacity
-// 1 - 0.75 x the tunnel strength of tunnel.js), so the page's own tunnel road under them shows through, in each theme; with the terrain
-// on, the tunnels' fade (the state rs_terrain_tunnel, elevation.js) multiplies it.
+// THE TUNNELS: a lane and a vehicle on a tunnel road fade as much as the page's tunnel roads: they are drawn see-through, with the
+// opacity (1 - the tunnel strength of tunnel.js)^2 (0.16 at the default 60 %: a faint ghost, as the tunnel road, whose colours move
+// that far toward the land colour), sides and all, in each theme; with the terrain on, the tunnels' fade (rs_terrain_tunnel,
+// elevation.js) multiplies it.
 // P1: flat ground (z 0), boxes, no camera.
 import {map, O, RS_PREFIX, _emit, _side} from "./core.js";
 import {TUNNEL} from "./tunnel.js";
@@ -160,10 +161,10 @@ function _vhTick(gl, now){
   if(now - _vhSentAt > 250){ _vhSentAt = now; _emit("rs:vehicletime", {t: _vhT}); }
 }
 
-// the opacity of a lane or a vehicle on a tunnel road: 1 - 0.75 x the tunnel strength (tunnel.js; 0 when the page has no tunnel look),
-// times the tunnels' fade with the terrain on (elevation.js sets rs_terrain_tunnel)
+// the opacity of a lane or a vehicle on a tunnel road: (1 - the tunnel strength)^2 (tunnel.js; strength 0 when the page has no tunnel
+// look), times the tunnels' fade with the terrain on (elevation.js sets rs_terrain_tunnel)
 function _vhTunnelOpacity(){
-  const k = 1 - 0.75 * (TUNNEL && TUNNEL.strength != null ? +TUNNEL.strength : 0) / 100;
+  const k = (1 - (TUNNEL && TUNNEL.strength != null ? +TUNNEL.strength : 0) / 100) ** 2;
   let f = 1; try { const v = map.getGlobalState().rs_terrain_tunnel; if(v != null) f = +v; } catch(e){ /* a map with no global state */ }
   return k * f;
 }
@@ -188,7 +189,7 @@ function _vhLanePaint(){
   const op = ["case", ["get", "tunnel"], _vhTunnelOpacity(), 1];
   for(const lv of _vhLevels){
     const [jn, mk, fl] = _vhIds4(lv);
-    if(map.getLayer(jn)) map.setPaintProperty(jn, "fill-color", fill);
+    if(map.getLayer(jn)){ map.setPaintProperty(jn, "fill-color", fill); map.setPaintProperty(jn, "fill-opacity", op); }
     if(map.getLayer(mk)){ map.setPaintProperty(mk, "line-color", mark); map.setPaintProperty(mk, "line-opacity", op); }
     if(map.getLayer(fl)){ map.setPaintProperty(fl, "line-color", fill); map.setPaintProperty(fl, "line-opacity", op); }
   }
