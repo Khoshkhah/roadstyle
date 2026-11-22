@@ -126,8 +126,8 @@ impl VehicleScene {
         .to_string()
     }
 
-    /// setEdges(json): the page's road of each SUMO edge, `{edge id: [level, tunnel]}` (the road's drawing level, its `fill_level`, and
-    /// whether it is a tunnel). A lane takes its edge's; a lane inside a junction takes the lane it leads to. `frame` and `lanes` then
+    /// setEdges(json): the page's road of each SUMO edge, `{edge id: [level, tunnel]}` (the road's level, its `lvl`: the OSM layer, else 1
+    /// for a bridge and -1 for a tunnel; and whether it is a tunnel). A lane takes its edge's; a lane inside a junction takes the lane it leads to. `frame` and `lanes` then
     /// give each vehicle and each lane its level and tunnel flag. Gives the number of lanes of net.xml whose edge is not in `json`
     /// (drawn at level 0, not as a tunnel).
     #[wasm_bindgen(js_name = setEdges)]

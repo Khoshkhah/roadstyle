@@ -11,8 +11,9 @@
 // THE LANES: the junction areas and the lanes of the run's net.xml (VehicleScene.lanes, the surface that the vehicles drive on), under the
 // vehicles: the junctions' polygons in the lane colour, then each lane at its width in metres, a marking line at the full width and the
 // surface on it less the marking. A lane inside a junction has no marking.
-// THE LEVELS: each lane and each vehicle has the drawing level of its road (the page's `fill_level`, by the SUMO edge id = the road's
-// `edge_id`; VehicleScene.setEdges). Each level has its own layers, from the lowest up: the junctions, the lane markings, the lanes,
+// THE LEVELS: each lane and each vehicle has the level of its road (the page's `lvl`: the OSM layer, else 1 for a bridge and -1 for a
+// tunnel; by the SUMO edge id = the road's `edge_id`; VehicleScene.setEdges). Not `fill_level`: that is the drawing order of the
+// classes, and two ground roads of a junction can differ in it. Each level has its own layers, from the lowest up: the junctions, the lane markings, the lanes,
 // then the vehicles of that level. So a bridge's lanes cover the vehicles under the bridge, and its vehicles are on top.
 // THE TUNNELS: a lane and a vehicle on a tunnel road fade as much as the page's tunnel roads: they are drawn see-through, with the
 // opacity (1 - the tunnel strength of tunnel.js)^2 (0.16 at the default 60 %: a faint ghost, as the tunnel road, whose colours move
@@ -26,7 +27,8 @@ const _VH_STRIDE = 16;                 // the numbers of one vehicle in VehicleS
 const _VH_MAX_CLASSES = 8;             // the colours the shader holds (a class number past it takes colour number % 8)
 const _VH_KEYS = ["placement", "teleport_m", "lane_change_s", "heading_lookahead_m", "class_sizes"];
 // the layers of one level: the junctions, the lane markings, the lanes, the vehicles
-const _vhIds4 = (lv) => ["vehicle-junctions", "vehicle-lane-marking", "vehicle-lane-fill", "vehicles"].map(k => `${RS_PREFIX}${k}-${lv}`);
+const _vhIds4 = (lv) => ["vehicle-junctions", "vehicle-lane-marking", "vehicle-lane-fill", "vehicles", "vehicle-junction-edges"].map(k => `${RS_PREFIX}${k}-${lv}`);
+const _VH_SEAM_M = 0.6;                // the outline of a junction's area, m: it covers the seam to its lanes, which SUMO does not draw to the edge exactly
 let _vhLevels = [0];                   // the levels of the run, from the lowest
 const _vhLayers = new Map();           // level -> its vehicle layer
 const _VH_M_PX = 40075016.686 / 512;   // the metres of one pixel at zoom 0 at the equator (MapLibre's 512 px tiles)
@@ -173,7 +175,7 @@ function _vhTunnelOpacity(){
 function _vhOnTop(){
   if(!_vhScene || !map.getLayer(_vhIds4(_vhLevels[0])[3])) return;
   _vhAddLanes();
-  const want = _vhLevels.flatMap(lv => _vhIds4(lv)).filter(id => map.getLayer(id)), order = map.getLayersOrder();
+  const want = _vhLevels.flatMap(lv => { const [jn, mk, fl, veh, je] = _vhIds4(lv); return [jn, je, mk, fl, veh]; }).filter(id => map.getLayer(id)), order = map.getLayersOrder();
   if(order.slice(-want.length).join() !== want.join()) want.forEach(id => map.moveLayer(id));
 }
 
@@ -188,8 +190,9 @@ function _vhLanePaint(){
   const l = O.vehicle_look.lanes, fill = _vhDark() ? l.fill.dark : l.fill.light, mark = _vhDark() ? l.marking.dark : l.marking.light;
   const op = ["case", ["get", "tunnel"], _vhTunnelOpacity(), 1];
   for(const lv of _vhLevels){
-    const [jn, mk, fl] = _vhIds4(lv);
+    const [jn, mk, fl, , je] = _vhIds4(lv);
     if(map.getLayer(jn)){ map.setPaintProperty(jn, "fill-color", fill); map.setPaintProperty(jn, "fill-opacity", op); }
+    if(map.getLayer(je)){ map.setPaintProperty(je, "line-color", fill); map.setPaintProperty(je, "line-opacity", op); }
     if(map.getLayer(mk)){ map.setPaintProperty(mk, "line-color", mark); map.setPaintProperty(mk, "line-opacity", op); }
     if(map.getLayer(fl)){ map.setPaintProperty(fl, "line-color", fill); map.setPaintProperty(fl, "line-opacity", op); }
   }
@@ -206,8 +209,10 @@ function _vhAddLanes(){
   const lat = _vhOrigin[1], mm = O.vehicle_look.lanes.marking_m, round = {"line-cap": "butt", "line-join": "round"};
   if(!map.getSource(src)) map.addSource(src, {type: "geojson", data: _vhLanes});
   for(const lv of _vhLevels){
-    const [jn, mk, fl, veh] = _vhIds4(lv), at = ["==", ["get", "level"], lv], lane = ["all", at, ["==", ["get", "kind"], "lane"]];
+    const [jn, mk, fl, veh, je] = _vhIds4(lv), at = ["==", ["get", "level"], lv], lane = ["all", at, ["==", ["get", "kind"], "lane"]];
     map.addLayer({id: jn, type: "fill", source: src, filter: ["all", at, ["==", ["get", "kind"], "junction"]]}, veh);
+    map.addLayer({id: je, type: "line", source: src, filter: ["all", at, ["==", ["get", "kind"], "junction"]], layout: round,
+                  paint: {"line-width": _vhPx(_VH_SEAM_M, lat)}}, veh);
     map.addLayer({id: mk, type: "line", source: src, filter: ["all", lane, ["!", ["get", "internal"]]], layout: round,
                   paint: {"line-width": _vhPx(["get", "w"], lat)}}, veh);
     map.addLayer({id: fl, type: "line", source: src, filter: lane, layout: round,
@@ -271,7 +276,7 @@ async function _vhEdges(){
   t = _side();
   const out = {};
   for(const p of t.props) if(p && p.edge_id != null){
-    const lv = p.fill_level != null ? +p.fill_level : 0, tun = p.tunnel != null && p.tunnel !== "no" && p.tunnel !== false ? 1 : 0;
+    const lv = p.lvl != null ? +p.lvl : 0, tun = p.tunnel != null && p.tunnel !== "no" && p.tunnel !== false ? 1 : 0;
     out[String(p.edge_id)] = [lv, tun];
   }
   return out;
