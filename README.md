@@ -15,6 +15,7 @@
   <a href="https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml"><img src="https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml/badge.svg?branch=main" alt="Tests"></a>
   <a href="https://khoshkhah.github.io/roadstyle/"><img src="https://img.shields.io/badge/docs-khoshkhah.github.io%2Froadstyle-ff6b35.svg" alt="Docs"></a>
   <a href="https://github.com/Khoshkhah/roadstyle/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://glama.ai/mcp/servers/Khoshkhah/roadstyle"><img src="https://glama.ai/mcp/servers/Khoshkhah/roadstyle/badges/score.svg" alt="Khoshkhah/roadstyle MCP server"></a>
 </p>
 
 <p align="center">
