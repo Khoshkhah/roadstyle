@@ -42,17 +42,16 @@ export function initBoundary(){
     if(map.getSource("rs-boundary-dim")) map.removeSource("rs-boundary-dim");
     if(_bdLim){ _bdLim = null; _bdZoom = null; map.setMinZoom(null); }
     const shape = _bdShape();
-    if(!shape) return;                                              // the style has no boundary
-    let w = 180, s = 90, e = -180, n = -90;
-    for(const [x, y] of shape.all){ w = Math.min(w, x); e = Math.max(e, x); s = Math.min(s, y); n = Math.max(n, y); }
-    if(rules.limit){
+    if(rules.limit && rules.bounds){
+      // the box of the limit's area: the page writer gives it (boundary_limit: true takes boundary's, else the area that the page gives)
+      const [w, s, e, n] = rules.bounds;
       // the center stays inside the bounds and their margin; the lowest zoom is `zoom_out` levels under the zoom that fits the boundary
       const px = (e - w) * rules.limit_pad, py = (n - s) * rules.limit_pad;
       _bdLim = {lo: [w - px, s - py], hi: [e + px, n + py]};
       _bdZoom = () => { const c = map.cameraForBounds([[w, s], [e, n]], {padding: 0}); if(c) map.setMinZoom(Math.max(0, c.zoom - rules.zoom_out)); };
       _bdZoom();
     }
-    if(rules.dim && shape.rings.length){
+    if(rules.dim && shape && shape.rings.length){
       map.addSource("rs-boundary-dim", {type: "geojson", data: {type: "Feature", properties: {}, geometry: {type: "Polygon", coordinates: [_bdWorld, ...shape.rings]}}});
       // under the roads and under the outline: before the first layer of the page that is not the backdrop, the base map or a layer of the base-map box
       const first = map.getStyle().layers.find(l => l.id !== "bg" && l.id !== "basemap" && !l.id.startsWith("vbm-") && !l.id.startsWith("rs-top-") && l.id !== "rs-boundary-dim");
