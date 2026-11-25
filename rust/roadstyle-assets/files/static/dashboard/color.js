@@ -1,6 +1,6 @@
 // "colour by" recolouring: each option's fill is baked per edge (__rs_fill / __rs_fill__1 …), and the road layers' expressions (made
 // in Python, render_web._fill_expr) pick the active option from the state rs_co. window.rsSetColorField sets it from your UI.
-import {map, O, OVERLAYS, RS_LEAN, RoadTable, _lyr, _src, _emit} from "./core.js";
+import {map, O, OVERLAYS, RS_LEAN, RoadTable, _lyr, _src, _emit, _role} from "./core.js";
 import {_tlHost} from "./panel.js";
 import {coUpdateLegend} from "./legend.js";
 export let COLOR_OPTIONS = [];
@@ -76,17 +76,35 @@ export function rsColorBase(groups){
   _emit("rs:colorchange", {base:true, groups:g.map(x=>({ids:x.ids, color:x.color}))});
 }
 // the road's own fill on or off: window.rsSetRoadFill(on) sets the state rs_fill_on, which the fill layers' opacities read (road_fill=False:
-// the casing only, the layers stay for clicks and hovers)
+// the casing only, the layers stay for clicks and hovers). With the fill off, a casing is its two borders around an empty middle of the fill's
+// width (road_fill.outline: the engine's line-width and line-gap-width of the road layer), so what is under the road shows.
 let RS_ROAD_FILL = {on:true, paint:{}};
+const _rfBase = {};        // the road layer's own line-width and line-gap-width, by layer id
+function _rfOutline(){
+  const ol = RS_ROAD_FILL.outline, on = RS_ROAD_FILL.on !== false;
+  if(!ol || !map.getStyle()) return;
+  for(const l of map.getStyle().layers.filter(x => x.type === "line" && _role(x) === "simple")){
+    if(!(l.id in _rfBase)) _rfBase[l.id] = {w: map.getPaintProperty(l.id, "line-width"), g: map.getPaintProperty(l.id, "line-gap-width"), c: map.getLayoutProperty(l.id, "line-cap")};
+    const b = _rfBase[l.id];
+    map.setPaintProperty(l.id, "line-width", on ? b.w : ol["line-width"]);
+    map.setPaintProperty(l.id, "line-gap-width", on ? b.g : ol["line-gap-width"]);
+    map.setLayoutProperty(l.id, "line-cap", on ? b.c : ol["line-cap"]);         // a round cap with a gap is a ring at each end of a piece
+    if(on) delete _rfBase[l.id];
+  }
+}
 export function rsSetRoadFill(on){
   map.setGlobalStateProperty("rs_fill_on", !!on);
   RS_ROAD_FILL.on = !!on;
+  _rfOutline();
   _emit("rs:roadfillchange", {road_fill:!!on});
 }
 let _coBox = null;   // the Colour by menu
 // the colour options and the menu: at the start, and again for a new style (rs.setStyle) in the same place in the stack
 export function useColor(){
   COLOR_OPTIONS = O.color_options; _coActive = O.color_active;
+  for(const k in _rfBase) delete _rfBase[k];             // a new style: its own widths
+  if(O.road_fill) RS_ROAD_FILL = {...O.road_fill, on: RS_ROAD_FILL.on};
+  if(RS_ROAD_FILL.on === false) _rfOutline();
   window.RS_COLOR_OPTIONS = COLOR_OPTIONS;
   let w = null;
   if(COLOR_OPTIONS.length > 1){
@@ -110,5 +128,6 @@ export function initColor(){
   if(_coActive){ const _ap=()=>rsSetColorField(_coActive);   // display the requested option on load
     if(map.isStyleLoaded && map.isStyleLoaded()) _ap(); else map.on("load", _ap); }
   RS_ROAD_FILL = O.road_fill;
+  if(RS_ROAD_FILL.on === false){ if(map.isStyleLoaded && map.isStyleLoaded()) _rfOutline(); else map.once("load", _rfOutline); }      // road_fill=False: the outline from the start
   window.rsSetRoadFill = rsSetRoadFill;
 }
