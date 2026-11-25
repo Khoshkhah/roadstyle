@@ -114,8 +114,14 @@ function _ovLazyRemove(ov){
   if(!z || !map.getSource(ov.source)) return;
   if(_ovSel && _ovSel.source === ov.source) clearOvSel();
   if(_ovHov && _ovHov.source === ov.source) _ovHov = null;
-  // the page's own changes of a layer (paint, layout, filter) stay in its definition for the next time it shows
-  for(const l of z.layers) if(map.getLayer(l.id)){ const s = map.getStyle().layers.find(x => x.id === l.id); Object.assign(l, {paint: s.paint, layout: s.layout, filter: s.filter}); map.removeLayer(l.id); }
+  // the page's own changes of a layer (paint, layout, filter) stay in its definition for the next time it shows. A key that the layer does not have
+  // stays out: addLayer refuses `filter: undefined`, and the overlay then showed only the first time (2026-11-25)
+  const now = map.getStyle().layers;
+  for(const l of z.layers) if(map.getLayer(l.id)){
+    const s = now.find(x => x.id === l.id);
+    for(const k of ["paint", "layout", "filter"]) if(s[k] === undefined) delete l[k]; else l[k] = s[k];
+    map.removeLayer(l.id);
+  }
   map.removeSource(ov.source);
 }
 // A page's script can change a layer of a hidden overlay while it is out of the map (noise-map sets its points' colour at the start): get and set of
