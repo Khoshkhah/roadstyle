@@ -18,6 +18,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Fixed
 
+- **A click on an overlay item or a base-map feature showed `__rs_bbox`.** The popup and `rs:select` listed roadstyle's own key (the box of the row) as a field. Now `_ovProps` (`dashboard/overlays.js`) leaves out every key that starts with `__rs`. The road popup, the tooltip, the road card and `rsGetProps` already left them out. Test: `tests/test_overlay_internal_fields_browser.py`.
 - **`roadstyle.duckosm.page(..., vehicles=...)` (the page of duckOSM's `net.map`) plays the run.** It took the option as it was, so the page had no vehicles module: "rs.vehicles.load: wasm is missing". Now both page writers make the option ready as `render_edges` does: the local files, roadstyle's vehicles module and the play bar.
 
 ## [0.30.0] - 2026-11-20

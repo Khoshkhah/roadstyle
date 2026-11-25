@@ -28,7 +28,8 @@ const _ovJson = r => r.url.startsWith("data:application/gzip") ? new Response(r.
 function _ovFetch(ov){ if(ov.props && !_ovRows[ov.props]) fetch(ov.props).then(_ovJson).then(j=>{
   _ovRows[ov.props] = j; OV_ROWS.set(ov.source, j.map((r, i) => ({id: i, properties: r, bbox: r.__rs_bbox}))); },
   e=>console.error("overlay rows:", e)); }
-const _ovProps = (ov, f) => ({...f.properties, ...(_ovRows[ov.props] || [])[f.id]});
+// an item's fields: its tile properties and its row, without roadstyle's own keys (__rs_bbox, ...): the popup, the panel and rs:select show the data only
+const _ovProps = (ov, f) => Object.fromEntries(Object.entries({...f.properties, ...(_ovRows[ov.props] || [])[f.id]}).filter(([k]) => !k.startsWith("__rs")));
 export function _ovAt(pt){
   const out=[];
   for(const ov of OVERLAYS){
