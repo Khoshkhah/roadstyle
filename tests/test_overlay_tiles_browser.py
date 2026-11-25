@@ -164,6 +164,44 @@ def test_a_road_with_its_fill_off_is_two_borders_with_an_empty_middle(tmp_path):
     assert errors == []
 
 
+def test_a_page_makes_the_hover_tooltip_of_an_overlay(tmp_path):
+    """rs.tooltip(label, fn): fn(properties) gives {title, rows}; the tooltip has the title in bold and one field on each line. null: no tooltip."""
+    import geopandas as gpd
+    from shapely.geometry import Point
+    pts = gpd.GeoDataFrame({"PK": [7]}, geometry=[Point(18.0025, 59.305)], crs=4326)
+    path = tmp_path / "t.html"
+    rs.render_dashboard(_edges(), basemap="blank", overlays=[rs.Overlay(pts, kind="circle", label="Walls", radius=8, popup_window=False)]).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            page.evaluate("""rs.tooltip('Walls', p => p.PK === 7 ? {title: 'Noise at the wall', rows: [['Wall', 'faces a street'], ['This hour', 63 + ' dB']]} : null);
+                             map.jumpTo({center: [18.0025, 59.305], zoom: 17})""")
+            page.wait_for_function("map.areTilesLoaded() && map.loaded()", timeout=20_000)
+            x, y = page.evaluate("(() => { const q = map.project([18.0025, 59.305]); return [q.x, q.y]; })()")
+            page.mouse.move(x - 30, y)
+            page.mouse.move(x, y)
+            page.wait_for_selector(".rs-tip .maplibregl-popup-content", timeout=5_000)
+            html = page.inner_html(".rs-tip .maplibregl-popup-content")
+            assert html.startswith("<b>Noise at the wall</b><br><b>Wall</b>: faces a street<br><b>This hour</b>: 63 dB"), html
+            page.mouse.move(x - 200, y)
+            page.evaluate("rs.tooltip('Walls', p => null)")
+            page.mouse.move(x, y)
+            page.wait_for_timeout(800)
+            assert page.locator(".rs-tip").count() == 0                     # null: no tooltip
+        finally:
+            browser.close()
+    assert errors == []
+
+def test_the_text_of_an_overlay_is_its_geojson():
+    """overlays.fc_text (the overlay's GeoJSON made as text, with no Python dict of a feature) gives the FeatureCollection of to_fc."""
+    import json
+
+    from roadstyle.overlays import fc_text, to_fc
+    z = _zones().to_crs(3006)
+    assert json.loads(fc_text(z)) == to_fc(z)
+    assert json.loads(fc_text({"type": "Point", "coordinates": [18.0, 59.3]})) == to_fc({"type": "Point", "coordinates": [18.0, 59.3]})
+
+
 def test_the_boundary_limits_the_camera_on_a_tiled_page(tmp_path):
     """boundary_limit=True on a tiled page: the boundary is a tile layer there, with no GeoJSON source, so the page gives its shape (O.boundary_shape).
     The camera's lowest zoom comes from the boundary, and a move far out comes back. Before, a tiled page had no limit."""
@@ -180,12 +218,3 @@ def test_the_boundary_limits_the_camera_on_a_tiled_page(tmp_path):
         finally:
             browser.close()
     assert errors == []
-
-def test_the_text_of_an_overlay_is_its_geojson():
-    """overlays.fc_text (the overlay's GeoJSON made as text, with no Python dict of a feature) gives the FeatureCollection of to_fc."""
-    import json
-
-    from roadstyle.overlays import fc_text, to_fc
-    z = _zones().to_crs(3006)
-    assert json.loads(fc_text(z)) == to_fc(z)
-    assert json.loads(fc_text({"type": "Point", "coordinates": [18.0, 59.3]})) == to_fc({"type": "Point", "coordinates": [18.0, 59.3]})

@@ -145,6 +145,7 @@ export function makeApi(extra){
       if("ids" in x) call("rsFilter", rows(x.ids));
     },
     setOverlay(name, visible){ call("rsSetOverlay", name, !!visible); },
+    tooltip(label, fn){ call("rsSetTooltip", label, fn); },      // the hover tooltip of an overlay, made by the page: fn(properties) -> {title, rows}
     setTunnelStyle(look){ call("rsSetTunnelStyle", look || {}); },
     setView(name){ call("rsSetView", name); },
     setBasemap(key){ call("rsSetBasemap", key); },
