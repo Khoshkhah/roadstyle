@@ -71,18 +71,29 @@ def test_a_building_click_gives_its_fields_and_a_theme_colours_its_kind(tmp_path
     assert p["kind"] == "apartments", p
 
 
-def test_the_3d_buildings_have_the_kind_colours(tmp_path, monkeypatch):
-    """With the 3D buildings on, each kind has its theme colour (the flat fill's `match` on kind), not one colour for all."""
+_THEME2 = """extends: grey
+features:
+  areas:
+    buildings:
+      fill: "#d6d3ce"
+      kinds: {apartments: {light: "#8fb0d8", dark: "#3f5878"}, office: "#cfc8bd"}
+"""
+
+
+def test_the_kind_colours_in_2d_and_3d_in_the_light_and_the_dark_theme(tmp_path, monkeypatch):
+    """Two kinds have two colours in the light and the dark theme, flat and in 3D. A kind's {light, dark} gives its own dark colour; a colour text has
+    the dark colour that the dark bands make of it."""
     import io
 
     from PIL import Image
 
     from roadstyle import duckosm
     (tmp_path / "themes").mkdir()
-    (tmp_path / "themes" / "kinds.yaml").write_text(_THEME)
+    (tmp_path / "themes" / "kinds2.yaml").write_text(_THEME2)
     monkeypatch.chdir(tmp_path)
     path = tmp_path / "b3.html"
-    duckosm.page(_db(tmp_path / "b.duckdb"), "driving", levels="tags", tiles=True, theme="kinds", dashboard={"panel": None}).save(str(path))
+    duckosm.page(_db(tmp_path / "b.duckdb"), "driving", levels="tags", tiles=True, theme="kinds2", dashboard={"panel": None}).save(str(path))
+    got = {}
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 1000, "height": 700})
@@ -90,16 +101,23 @@ def test_the_3d_buildings_have_the_kind_colours(tmp_path, monkeypatch):
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(path.resolve().as_uri())
         page.wait_for_function("window.map && window.map.loaded() && window.rsReady", timeout=60_000)
-        page.evaluate("map.jumpTo({center: [7.4045, 43.7294], zoom: 17}); rsSetBuildings3D(true)")
-        page.wait_for_function("map.areTilesLoaded() && map.loaded()", timeout=20_000)
-        page.wait_for_timeout(500)
-        ex = page.evaluate("""() => { const ov = RS_OVERLAYS.find(o => o.label === 'buildings');
-          return {vis: map.getLayoutProperty(ov.extrude, 'visibility'), color: map.getPaintProperty(ov.extrude, 'fill-extrusion-color')}; }""")
-        pts = page.evaluate("""() => { const r = map.getContainer().getBoundingClientRect();
-          return [[7.4020, 43.7294], [7.4070, 43.7294]].map(c => { const q = map.project(c); return [r.left + q.x, r.top + q.y]; }); }""")
-        shot = Image.open(io.BytesIO(page.screenshot())).convert("RGB")
+        page.evaluate("map.jumpTo({center: [7.4045, 43.7294], zoom: 17})")
+        paint = page.evaluate("""() => { const ov = RS_OVERLAYS.find(o => o.label === 'buildings');
+          return [JSON.stringify(map.getPaintProperty(ov.layers.find(i => i.endsWith('-fill')), 'fill-color')),
+                  JSON.stringify(map.getPaintProperty(ov.extrude, 'fill-extrusion-color'))]; }""")
+        for theme in ("light", "dark"):
+            for on in (False, True):
+                page.evaluate(f"rsSetTheme('{theme}'); rsSetBuildings3D({str(on).lower()})")
+                page.wait_for_function("map.areTilesLoaded() && map.loaded()", timeout=20_000)
+                page.wait_for_timeout(500)
+                pts = page.evaluate("""() => { const r = map.getContainer().getBoundingClientRect();
+                  return [[7.4020, 43.7294], [7.4070, 43.7294]].map(c => { const q = map.project(c); return [r.left + q.x, r.top + q.y]; }); }""")
+                shot = Image.open(io.BytesIO(page.screenshot())).convert("RGB")
+                got[(theme, on)] = [shot.getpixel((round(x), round(y))) for x, y in pts]
         browser.close()
     assert errors == []
-    assert ex["vis"] == "visible" and "#123456" in str(ex["color"]) and "#654321" in str(ex["color"]), ex
-    home, office = (shot.getpixel((round(x), round(y))) for x, y in pts)
-    assert sum(abs(a - b) for a, b in zip(home, office, strict=True)) > 60, (home, office)   # two kinds, two colours (with the 3D shade)
+    for layer in paint:                                                    # the flat fill and the 3D blocks: both kinds, the own dark colour
+        assert "#8fb0d8" in layer and "#3f5878" in layer and "#cfc8bd" in layer, layer
+    for k, (home, office) in got.items():
+        assert sum(abs(a - b) for a, b in zip(home, office, strict=True)) > 40, (k, home, office)   # two kinds, two colours
+    assert sum(got[("dark", False)][0]) < sum(got[("light", False)][0]) - 150, got                  # the dark theme is dark

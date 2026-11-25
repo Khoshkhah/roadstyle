@@ -18,6 +18,11 @@ fn is_dark() -> Value {
     json!(["==", ["global-state", STATE], "dark"])
 }
 
+/// A colour that the style gives for each theme: `light`, and `dark` in the dark theme. `layers` keeps it as it is.
+pub fn by_theme(light: &Value, dark: &Value) -> Value {
+    json!(["case", is_dark(), dark, light])
+}
+
 /// A colour text as channels (0 to 1) and its alpha: "#rrggbb", "#rgb", "rgb(r,g,b)" or "rgba(r,g,b,a)". A colour name is not read: a name in a style is a
 /// label (a kind of land, a class).
 fn read(c: &str) -> Option<([f64; 3], Option<f64>)> {
@@ -65,6 +70,8 @@ fn themed(e: &Value, band: &DarkBand, keep: &[String]) -> Value {
             }
             _ => e.clone(),
         },
+        // a colour that the style gives for each theme already (by_theme: a theme's own dark colour of a building kind)
+        Value::Array(a) if a.len() == 4 && a[0] == "case" && a[1] == is_dark() => e.clone(),
         Value::Array(a) => Value::Array(a.iter().map(|x| themed(x, band, keep)).collect()),
         _ => e.clone(),
     }

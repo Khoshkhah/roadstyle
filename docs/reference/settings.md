@@ -72,7 +72,11 @@ rs.duckosm.page("norrmalm.duckdb", theme="noise")
 ```
 
 **Buildings by kind:** `kinds` gives a colour to each building kind (duckOSM's `kind`, the OSM `building` tag). A building of another kind
-has the `fill` colour. The tiles then also hold each building's `kind`.
+has the `fill` colour. The flat buildings and the 3D buildings use the same colours. The tiles then also hold each building's `kind`.
+
+- A colour text is the colour in the light theme. The dark theme makes a dark colour from it, as it does for `fill`. Pale colours can then
+  look almost the same in the dark theme.
+- `{light: ..., dark: ...}` gives the colour of each theme.
 
 ```yaml
 # ./themes/noise.yaml
@@ -82,7 +86,11 @@ features:
     buildings:
       fill: "#d6d3ce"                  # every other kind (yes, garage, shed, ...)
       outline: "#bdb8b0"
-      kinds: {apartments: "#b9c3cf", house: "#b9c3cf", residential: "#b9c3cf", office: "#cfc8bd", retail: "#d8c3c3", school: "#c9d3c0"}
+      kinds:
+        apartments: {light: "#8fb0d8", dark: "#3f5878"}    # a colour for each theme
+        house: {light: "#8fb0d8", dark: "#3f5878"}
+        office: "#cfc8bd"                                  # the dark theme makes its dark colour
+        retail: "#d8c3c3"
 ```
 
 - A file without `extends` is a full theme over the OpenStreetMap colours, as a bundled theme is.
