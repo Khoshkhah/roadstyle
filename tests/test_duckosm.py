@@ -467,7 +467,10 @@ def test_the_base_map_layers_switch_keeps_the_pages_overlays_and_rs_set_roads_ke
 
     pts = __import__("geopandas").GeoDataFrame({"PK": [1]}, geometry=shapely.points([[7.405, 43.73]]), crs=4326)
     out = tmp_path / "r.html"
-    page = duckosm.page(_tiny(tmp_path / "r.duckdb"), "driving", levels="tags", overlays=[rs.Overlay(pts, kind="circle", label="Walls")],
+    db = _tiny(tmp_path / "r.duckdb")
+    with __import__("duckdb").connect(str(db)) as con:
+        con.execute("UPDATE driving.edges SET oneway = true WHERE edge_id = 1")      # a one-way road: the page has its arrow layer
+    page = duckosm.page(db, "driving", levels="tags", overlays=[rs.Overlay(pts, kind="circle", label="Walls")],
                         dashboard={"toolbar": {}})
     assert _opt(page.html, "overlays_label") == "Base map layers"
     page.save(str(out))
@@ -491,7 +494,14 @@ def test_the_base_map_layers_switch_keeps_the_pages_overlays_and_rs_set_roads_ke
         assert pg.evaluate("rs.getState().roads") == {"on": False, "labels": True} and pg.evaluate("window.__st.roads.on") is False
         pg.evaluate("rsSetRoads(false, {labels: false})")
         assert all(vis == "none" for _, _, vis in pg.evaluate(roads))
+        arrows = pg.evaluate("map.getStyle().layers.filter(l => l.type === 'symbol' && JSON.stringify(l.layout['icon-image'] || '').includes('rs-oneway')).map(l => l.id)")
+        assert arrows, "the page has an arrow layer"
+        pg.evaluate("rsSetArrows(true); document.dispatchEvent(new Event('rs:toprowschange'))")     # another switch of a road layer: the roads stay hidden
+        assert all(vis == "none" for _, _, vis in pg.evaluate(roads))
+        pg.evaluate("rsSetArrows(false)")                                # the arrows' switch off while the roads are hidden: off after rsSetRoads(true)
         pg.evaluate("rs.setState({roads: {on: true}})")
+        assert pg.evaluate("ids => ids.map(id => map.getLayoutProperty(id, 'visibility'))", arrows) == ["none"] * len(arrows)
+        pg.evaluate("rsSetArrows(true)")
         assert pg.evaluate(roads) == before
         browser.close()
     assert errors == []

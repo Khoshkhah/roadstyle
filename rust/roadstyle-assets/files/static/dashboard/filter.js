@@ -152,7 +152,7 @@ export function rsSetAccess(kind, on){      // show / hide the roads of one acce
 }
 // rsSetRoads(on, {labels}): the drawing of the roads (fill, casing, dashes, arrows, bridges, tunnels: every layer of a road source) off, or on again. `labels`
 // (default true): the street names stay while the roads are off. Each layer gets back the visibility that it had (an arrow switch that is off stays off).
-// ponytail: a switch that shows a road layer while the roads are off (rsSetArrows) shows it; the next rsSetRoads(false) hides it again.
+// Another switch of a road layer (the one-way arrows) goes through _roadVis: while rsSetRoads hides the layer, the switch's value waits for rsSetRoads(true).
 let _roads = {on: true, labels: true};
 const _roadsVis = {};
 const _isName = l => l.type === "symbol" && !!l.layout && l.layout["text-field"] != null;
@@ -162,6 +162,11 @@ function _roadsApply(){
     if(off && !(l.id in _roadsVis)){ _roadsVis[l.id] = map.getLayoutProperty(l.id, "visibility") || "visible"; map.setLayoutProperty(l.id, "visibility", "none"); }
     else if(!off && l.id in _roadsVis){ map.setLayoutProperty(l.id, "visibility", _roadsVis[l.id]); delete _roadsVis[l.id]; }
   }
+}
+// _roadVis(id, v): a switch's visibility ("visible" or "none") for a road layer. A layer that rsSetRoads hides stays hidden, and gets `v` at rsSetRoads(true).
+export function _roadVis(id, v){
+  if(id in _roadsVis){ _roadsVis[id] = v; return; }
+  if(map.getLayoutProperty(id, "visibility") !== v) map.setLayoutProperty(id, "visibility", v);
 }
 export function rsSetRoads(on, o){
   _roads = {on: !!on, labels: !o || o.labels !== false};
