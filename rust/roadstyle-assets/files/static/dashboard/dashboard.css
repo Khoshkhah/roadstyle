@@ -1418,7 +1418,14 @@ html[data-rs-theme=dark],#sb[data-theme=dark]{--rs-unsaved:#fbbf24}
 :is(#sb,body) .rs-hours .rs-hours-field{font-variant-numeric:tabular-nums}
 :is(#sb,body) .rs-hours-n{flex:none;min-width:30px;color:var(--mut);font:600 12.5px system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:right}
 /* 3. the slider: the browser's range input on a thin track; the fill is the chosen part. Two handles: two inputs on one track */
-:is(#sb,body) .rs-slider-track{position:relative;height:24px}
+:is(#sb,body) .rs-slider{--rs-sl-th:18px}
+:is(#sb,body) .rs-slider-track{position:relative;height:24px;cursor:pointer;touch-action:none}
+/* a slider of 12 steps or fewer: a mark and the label of each step under the track; a press on a label selects its step */
+:is(#sb,body) .rs-slider-ticks{position:relative;height:20px;margin:-2px 0 0;touch-action:none}
+:is(#sb,body) .rs-slider-tick{position:absolute;top:0;transform:translateX(-50%);padding:5px 3px 1px;border-radius:4px;color:var(--mut);font:500 10.5px/13px system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;user-select:none}
+:is(#sb,body) .rs-slider-tick::before{content:"";position:absolute;top:0;left:50%;width:1px;height:4px;background:color-mix(in srgb,var(--mut) 60%,transparent)}
+:is(#sb,body) .rs-slider-tick:hover{background:var(--rs-hover-bg);color:var(--ink)}
+:is(#sb,body) .rs-slider-tick.on{color:var(--rs-accent-text);font-weight:600}
 :is(#sb,body) .rs-slider-track::before,.rs-slider-fill{content:"";position:absolute;top:10px;height:4px;border-radius:2px}
 :is(#sb,body) .rs-slider-track::before{left:0;right:0;background:color-mix(in srgb,var(--mut) 30%,transparent)}
 .rs-slider-fill{background:var(--accent-fill)}
@@ -1670,6 +1677,9 @@ html.rs-phone :is(#sb,body) .rs-day :is(button,.rs-day-step){height:42px}      /
 html.rs-phone :is(#sb,body) .rs-day .rs-day-step{width:42px}
 html.rs-phone :is(#sb,body) .rs-num-st{width:42px}
 html.rs-phone :is(#sb,body) :is(.rs-toolrow button,.rs-more-btn){width:40px;height:40px}
+html.rs-phone :is(#sb,body) .rs-slider{--rs-sl-th:24px}
+html.rs-phone :is(#sb,body) .rs-slider-tick{padding:6px 2px 4px;font-size:11px}
+html.rs-phone :is(#sb,body) .rs-slider-ticks{height:26px}
 html.rs-phone :is(#sb,body) .rs-slider-track{height:36px}
 html.rs-phone :is(#sb,body) .rs-slider input[type=range]{height:36px}
 html.rs-phone :is(#sb,body) .rs-slider-track::before,html.rs-phone .rs-slider-fill{top:16px}
