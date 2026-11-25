@@ -11,6 +11,7 @@
 #   centroid  true = use the polygon centroid (a point from an area, e.g. the parking "P")
 #   bearing   true = carry the road bearing (oriented crossings)
 #   height    true = carry a height in metres for 3D (buildings; osm_carto.yaml features.buildings_3d)
+#   tile_keys the keys that the layer's tiles keep beside what its look reads (the other fields are in the page's rows of the layer)
 # the columns a feature's popup and tooltip show (the page and the GeoLibre look)
 popup: [name, kind]
 layers:
@@ -28,7 +29,7 @@ layers:
   - {name: water,           table: water_polygons,   kind: polygon, show: true}   # incl. the river (smart clip)
   - {name: waterways,       table: water_lines,      kind: line,    show: true}
   - {name: paved,           table: paved,            kind: polygon, show: true}   # squares, pedestrian areas, piers, helipads (duckOSM 0.6.0)
-  - {name: buildings,       table: buildings,        kind: polygon, show: true, height: true}
+  - {name: buildings,       table: buildings,        kind: polygon, show: true, height: true, tile_keys: [osm_id]}   # osm_id: text, exact
   # the ways that OSM has and no mode network holds (outside_networks: not in <mode>.edges, private_edges or edge_id_map): the raceway
   # (Circuit de Monaco), small pieces that touch no network, platforms, lifts. The roads of the page come from the networks.
   - {name: raceway,         table: streets,          kind: line,    show: true, where: "kind = 'raceway'", outside_networks: true}

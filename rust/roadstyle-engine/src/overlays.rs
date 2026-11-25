@@ -246,6 +246,10 @@ pub fn styled_layers(facts: &[LayerFacts], look: &crate::Look) -> (Vec<Overlay>,
             ov.opacity = a.get("opacity").cloned().unwrap_or(json!(1.0));
             ov.width = json!(0.5);
             l["min_zoom"] = a.get("min_zoom").cloned().unwrap_or(Value::Null);
+            // a colour for each kind (a theme's `kinds`, as landcover's): the others have the fill
+            if let Some(k) = a.get("kinds").and_then(Value::as_object).filter(|k| !k.is_empty()) {
+                l["color_by"] = json!({"map": k, "default": ov.color});
+            }
             if f.height {
                 l["extrude"] = json!({"color": a.get("fill").cloned().unwrap_or(Value::Null), "opacity": st["buildings_3d"]["opacity"]});
             }

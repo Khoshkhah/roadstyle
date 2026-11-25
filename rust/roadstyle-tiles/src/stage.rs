@@ -24,6 +24,8 @@ pub struct TileOptions {
     pub source_reads: HashMap<String, HashSet<String>>,
     /// the popup fields of each overlay that has some, by source (`props::overlay_popups`): not in its tiles, but in its props file
     pub popups: HashMap<String, Vec<String>>,
+    /// the keys that a base-map layer's tiles keep beside what its layers read, by source (`props::tile_keys`: the buildings' osm_id)
+    pub tile_keys: HashMap<String, Vec<String>>,
     /// the generation of the road set (`props::GENERATION`; None: the roads have no edge ids)
     pub generation: Option<String>,
     /// the base-map layers (`BASE_LAYERS`): a layer outside it and outside the roads, pieces and slots keeps all its properties
@@ -61,7 +63,7 @@ impl TileOptions {
 
     /// The first tile rule that is not the same in `new` (`keeps_tiles`), by its name; None: every rule is the same.
     pub fn differs_from(&self, new: &TileOptions) -> Option<&'static str> {
-        let rules: [(&'static str, bool); 15] = [("min_zoom", self.min_zoom == new.min_zoom), ("max_zoom", self.max_zoom == new.max_zoom),
+        let rules: [(&'static str, bool); 16] = [("tile_keys", self.tile_keys == new.tile_keys), ("min_zoom", self.min_zoom == new.min_zoom), ("max_zoom", self.max_zoom == new.max_zoom),
             ("buffer_px", self.buffer_px == new.buffer_px),
             ("buffers", new.needs.len() == self.buffers.len() && new.needs.iter().zip(&self.buffers).all(|(n, b)| n <= b)), ("read", self.read == new.read),
             ("source_reads", self.source_reads == new.source_reads), ("popups", self.popups == new.popups), ("generation", self.generation == new.generation),
@@ -90,6 +92,7 @@ impl TileOptions {
         let base = metadata[roadstyle_model::props::BASE_LAYERS].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect();
         let generation = metadata[roadstyle_model::props::GENERATION].as_str().map(String::from);
         let popups = roadstyle_model::props::overlay_popups(metadata);
+        let tile_keys = roadstyle_model::props::tile_keys(metadata);
         let classes: Vec<String> = metadata[roadstyle_model::props::CLASSES].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect();
         // the Roads filter hides a class by its class number: a class of the filter that the model lacks (Monaco: ferry) has its own number after the model's
         let mut extra: Vec<String> = Vec::new();
@@ -106,7 +109,7 @@ impl TileOptions {
             extra.clear();
         }
         let codes = crate::codes::Codes { classes, extra, class_col, dashes: crate::codes::dash_patterns(layers), filter_codes };
-        Ok(TileOptions { min_zoom, max_zoom, buffer_px, needs, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, popups, base, generation,
+        Ok(TileOptions { min_zoom, max_zoom, buffer_px, needs, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, popups, tile_keys, base, generation,
                          pieces, exact: None, only: None, slots_from, wait: false, format: Default::default(),
                          codes })
     }
@@ -150,7 +153,7 @@ impl TileOptions {
             // `__rs_edge` is the carrier of a file's slot id
             "slots" => (reads(name).into_iter().chain(page_reads(Kind::Slots)).chain(filter_keys().map(String::from)).chain([Mark::Edge.name().into()]).collect(), true, self.slots_from),
             // a base-map layer and a layer with popup fields keep what its layers read: a popup reads its props file by row
-            _ if self.base.contains(name) || self.popups.contains_key(name) => (reads(name), false, 0),
+            _ if self.base.contains(name) || self.popups.contains_key(name) => (reads(name).into_iter().chain(self.tile_keys.get(name).into_iter().flatten().cloned()).collect(), false, 0),
             _ => (self.read.iter().cloned().chain(props()).collect(), false, 0),
         }
     }

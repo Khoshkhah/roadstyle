@@ -102,6 +102,14 @@ fn look_half(look: &Look, roads: &Roads, simple: &simple::SimpleSource, slots: &
     let (mut layers, info) = layers::road_layers(look, roads, simple, slots, decks, ovs, &colors.props, colors.active)?;
     let popups: Map<String, Value> = info.overlays.iter().filter(|o| o["popup"].as_array().is_some_and(|a| !a.is_empty()))
         .filter_map(|o| Some((o["source"].as_str()?.to_string(), o["popup"].clone()))).collect();
+    // the keys that a base-map layer's tiles keep beside what its layers read (layers.yaml `tile_keys`: the buildings' osm_id), by source
+    let specs = look.sections.base_map.as_ref().and_then(|b| b.layers_yaml["layers"].as_array()).cloned().unwrap_or_default();
+    let tile_keys: Map<String, Value> = info.overlays.iter().filter_map(|o| {
+        let label = o["label"].as_str()?;
+        ovs.iter().find(|ov| ov.user.is_none() && ov.name == label)?;
+        let keys = specs.iter().find(|s| s["name"] == label)?.get("tile_keys").filter(|k| k.as_array().is_some_and(|a| !a.is_empty()))?;
+        Some((o["source"].as_str()?.to_string(), keys.clone()))
+    }).collect();
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
     let live = look.map.output.state == roadstyle_look::options::State::Live;
@@ -128,6 +136,9 @@ fn look_half(look: &Look, roads: &Roads, simple: &simple::SimpleSource, slots: &
     let mut metadata = metadata(look, images, planned, colors.meta.clone(), &layers, contract)?;
     if !popups.is_empty() {
         metadata.insert(roadstyle_model::props::POPUPS.into(), popups.into());
+    }
+    if !tile_keys.is_empty() {
+        metadata.insert(roadstyle_model::props::TILE_KEYS.into(), tile_keys.into());
     }
     Ok(LookHalf { layers, metadata: Value::Object(metadata), glyphs, state, sources })
 }
