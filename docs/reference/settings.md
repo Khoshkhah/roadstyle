@@ -71,6 +71,20 @@ features:
 rs.duckosm.page("norrmalm.duckdb", theme="noise")
 ```
 
+**Buildings by kind:** `kinds` gives a colour to each building kind (duckOSM's `kind`, the OSM `building` tag). A building of another kind
+has the `fill` colour. The tiles then also hold each building's `kind`.
+
+```yaml
+# ./themes/noise.yaml
+extends: grey
+features:
+  areas:
+    buildings:
+      fill: "#d6d3ce"                  # every other kind (yes, garage, shed, ...)
+      outline: "#bdb8b0"
+      kinds: {apartments: "#b9c3cf", house: "#b9c3cf", residential: "#b9c3cf", office: "#cfc8bd", retail: "#d8c3c3", school: "#c9d3c0"}
+```
+
 - A file without `extends` is a full theme over the OpenStreetMap colours, as a bundled theme is.
 - An own file with the name of a bundled theme is used in its place. In that file, `extends` with the same name is the bundled theme.
 - An unknown name is an error that lists the names there are.

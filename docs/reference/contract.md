@@ -38,6 +38,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | `roadstyle:popups` | the popup fields of each overlay that has some, by its source: `{source: [field]}`. They are not in the overlay's tiles: its props file (`props/<source>.json`, named in `roadstyle:interaction.base_props`) holds them by row, which is the feature id |
 | `roadstyle:classes` | the model's classes, in their order. `__rs_ci` (the class of a piece, and of a slot in a tile) is a place in this list; a class that is not in it has the number of the list. The style of a tile has the list with that number's entry (the empty text) and then the Roads filter's classes that the model lacks (docs/design/tiling.md). The tile cut and the style of the tile layers use it: a tile has no class text (docs/design/tiling.md); `arrows.js` reads a slot's class through it |
 | `roadstyle:base` | the names of the base-map layers, if the map has any. The tiles of such a layer keep only the properties that its style layers and the popup read |
+| `roadstyle:tile_keys` | the keys that a base-map layer's tiles keep beside what its style layers read, by its source: `{source: [key]}` (`layers.yaml` `tile_keys`; the buildings keep `osm_id`, as text) |
 | Parquet field `roadstyle:json` | stage 1's Parquet files (`write_sources`): a column whose values are JSON text (values of more than one type, lists or objects) |
 
 ## The dashboard's options from the style
