@@ -20,7 +20,7 @@ const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "basemap_switcher": true, "name": "roadstyle", "pitch": null,
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
-    "street_view_key": null, "street_view_mode": null, "mapillary_token": null, "google_3d": null, "hover_color": null, "compress": true, "views": null, "tiles": true,
+    "street_view_key": null, "street_view_mode": null, "mapillary_token": null, "google_3d": null, "hover_color": null, "compress": true, "views": null, "tiles": true, "lazy_overlays": false,
     "template": null, "layout": null, "dashboard": null, "page_script": null, "vehicles": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": [], "google_3d_selected": true, "hillshade": false, "terrain": false, "terrain_exaggeration": null, "terrain_tunnels": "fade", "buildings_opacity": null, "ground": null, "scene_3d": null}"#;
 
 /// The map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
@@ -84,6 +84,7 @@ struct PageKeys {
     compress: bool,
     views: Value,
     tiles: bool,
+    lazy_overlays: bool,
     filter_control: bool,
     legend: bool,
     hillshade: bool,
@@ -121,6 +122,20 @@ pub fn page_key_defaults() -> Map<String, Value> {
 pub struct Page {
     pub html: String,
     pub warnings: Vec<String>,
+    /// the files that go next to the page (`lazy_overlays=True`): (the path relative to the page, the bytes). Empty: the page is one file
+    pub files: Vec<(String, Vec<u8>)>,
+}
+
+impl Page {
+    /// Write `files` into `dir`, the folder of the page.
+    pub fn write_files(&self, dir: &std::path::Path) -> Result<(), crate::Error> {
+        for (path, bytes) in &self.files {
+            let p = dir.join(path);
+            p.parent().map(std::fs::create_dir_all).transpose().and_then(|_| std::fs::write(&p, bytes))
+                .map_err(|e| crate::error::file(p.display(), e))?;
+        }
+        Ok(())
+    }
 }
 
 /// The page of `roads` with `look` (resolved from `options`, which a view's palette resolves again with its palette). `given`: the
@@ -299,6 +314,9 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let (mode, key) = check_keys(&k, look, &dashboard)?;
     let bounds = bounds_of(&roads);
     let tiled = k.tiles;
+    if k.lazy_overlays && !tiled {
+        return Err(crate::error::options("lazy_overlays=True needs tiles=True: the file of an overlay is its own PMTiles archive"));
+    }
     let mut src = crate::sources_of(roads, look, features, None, look.map.output.name.clone())?;
     let (active, bms, base) = basemaps(&k, look, &mut src.warnings)?;
     let bg = bg_color(&active, look);
@@ -307,10 +325,10 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     if tiled && views.iter().any(|v| v["set"].get("palette").is_some()) {
         return Err(crate::Error::Engine(roadstyle_engine::Error::Unsupported(roadstyle_engine::Unsupported::TiledPalettes)));
     }
-    let (mut style, archive) = if tiled { tiled_page(&src, look, &a)? } else {
+    let (mut style, archive, files) = if tiled { tiled_page(&src, look, &a, k.lazy_overlays)? } else {
         src.page_arrows();          // stage 3 of the inline page: the arrows are points that the page puts itself (audit N2)
         // the style without its sources' data, which the page writer writes from `src` (audit D3, N29)
-        (src.style_with(crate::sources::SourceMode::inline_of(&a), false), Vec::new())
+        (src.style_with(crate::sources::SourceMode::inline_of(&a), false), Vec::new(), Vec::new())
     };
     let mut table = Vec::new();
     crate::write_road_table(&src, None, true, &mut table).map_err(|e| crate::error::file(crate::ROAD_TABLE, e))?;
@@ -369,6 +387,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let parts = PageParts {
         name: &k.name, cam: page_camera(look, &k)?, bounds, side_panel_html: k.side_panel_html.as_deref(),
         host_panel_width: k.host_panel_width, compress: k.compress, gz: None, tiles: archive.iter().map(|(k, a)| (k.as_str(), a.as_slice())).collect(),
+        tile_files: files.iter().filter(|f| f.kind == FileKind::Tiles).map(|f| (f.source.as_str(), f.path.as_str())).collect(),
         side: Some((&Value::Null, Some(&side))), simple_js: Some(&simple_js), sources: Some(&src),
     };
     let mut html = page_html(page_style, &opts, &parts);
@@ -381,7 +400,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
             html = html.replacen("</body>", &format!("<{tag}>{}</{tag}></body>", t.replace(&format!("</{tag}"), &format!("<\\/{tag}"))), 1);
         }
     }
-    Ok(Page { html, warnings: std::mem::take(&mut src.warnings) })
+    Ok(Page { html, warnings: std::mem::take(&mut src.warnings), files: files.into_iter().map(|f| (f.path, f.bytes)).collect() })
 }
 
 fn number(v: &Value) -> Result<serde_json::Number, crate::Error> {
@@ -697,7 +716,36 @@ const WHOLE_SOURCES: [&str; 2] = ["decks", "shadows"];
 /// The PMTiles archives of a tiled page by source: `roads` first, then each hidden overlay's own.
 type Archives = Vec<(String, Vec<u8>)>;
 
-fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value, Archives), crate::Error> {
+/// The folder of a page's files (`lazy_overlays=True`), next to the page.
+pub const FILES_DIR: &str = "rs-files";
+
+#[derive(PartialEq)]
+enum FileKind {
+    Tiles,
+    Rows,
+}
+
+/// A file of a page with `lazy_overlays=True`: the archive (its tiles gzipped) or the gzipped rows of an overlay, at `path` (relative to the page).
+struct PageFile {
+    source: String,
+    kind: FileKind,
+    path: String,
+    bytes: Vec<u8>,
+}
+
+/// `bytes` as a page file of `source` (the rows gzipped already). The name has a hash of the bytes: two pages in one folder do not overwrite the file of the
+/// other, and a browser can keep a file in its cache.
+fn page_file(source: &str, kind: FileKind, bytes: Vec<u8>) -> PageFile {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut h);
+    let ext = if kind == FileKind::Tiles { "pmtiles" } else { "json.gz" };
+    PageFile { path: format!("{FILES_DIR}/{source}-{:016x}.{ext}", h.finish()), source: source.into(), kind, bytes }
+}
+
+/// `lazy`: the archive and the rows of each overlay with its own source (each hidden overlay) go into files next to the page (docs/design/tiling.md,
+/// "Overlays in files"): the page reads the tiles of the view from the archive while the overlay shows, and the rows when it first shows.
+fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>, lazy: bool) -> Result<(Value, Archives, Vec<PageFile>), crate::Error> {
     let c = &look.map.columns;
     let hw = Some(c.class.as_str()).filter(|h| !h.is_empty()).unwrap_or("highway");
     fn col(v: &Option<String>) -> Option<&str> {
@@ -718,7 +766,8 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
     // an overlay whose layers make no tile at any zoom (its style hides it at every tile zoom) has no archive: it stays in `roads`
     let mut archives = Vec::new();
     for k in overlay_sources(&style).into_iter().filter(|k| names.contains(k)) {
-        match t.archive_of(bounds, std::slice::from_ref(&k), true) {
+        // a file (lazy): its tiles gzipped one by one, for a read of one tile; in the page: plain, as the page gzips the whole archive
+        match t.archive_of(bounds, std::slice::from_ref(&k), !lazy) {
             Ok(a) => archives.push((k, a)),
             Err(crate::tiles::Error::Empty) => {}
             Err(e) => return Err(e.into()),
@@ -738,17 +787,30 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
         }
         Err(e) => return Err(e.into()),
     };
+    let mut files: Vec<PageFile> = Vec::new();
+    if lazy {
+        // the archives that are left here are the hidden overlays' own (own_sources): roads goes in below
+        files.extend(archives.drain(..).map(|(k, a)| page_file(&k, FileKind::Tiles, a)));
+    }
     archives.insert(0, (crate::tiles::SOURCE.to_string(), roads));
     // the rows of each overlay (all its properties and its box): the tiles have only the keys that the style reads
+    let mut rows = Vec::new();
     let urls: Map<String, Value> = s.shown().filter(|(k, _)| o.wants(k) && !["simple", "slots"].contains(k)).filter_map(|(k, src)| {
         use base64::Engine;
         let gz = crate::tiles::pmtiles::gzip_at(crate::rows_file(src)?.as_bytes(), 9);
+        if files.iter().any(|f| f.source == k) {          // an overlay in files: its rows too
+            let f = page_file(k, FileKind::Rows, gz);
+            let path = f.path.clone().into();
+            rows.push(f);
+            return Some((k.to_string(), path));
+        }
         Some((k.to_string(), format!("data:application/gzip;base64,{}", base64::engine::general_purpose::STANDARD.encode(gz)).into()))
     }).collect();
+    files.extend(rows);
     if !urls.is_empty() {
         style["metadata"]["roadstyle:interaction"]["base_props"] = Value::Object(urls);
     }
-    Ok((style, archives))
+    Ok((style, archives, files))
 }
 
 /// One source for each hidden overlay (docs/design/tiling.md): the layers of each overlay in `own` move from the source `roads` to a vector source

@@ -141,6 +141,8 @@ pub struct PageParts<'a> {
     pub gz: Option<Map<String, Value>>,
     /// a tiled page: its PMTiles archives by source (`roads` and each overlay's own); empty: not tiled
     pub tiles: Vec<(&'a str, &'a [u8])>,
+    /// the archives that are files next to the page (`lazy_overlays=True`): (source, the path of the file relative to the page)
+    pub tile_files: Vec<(&'a str, &'a str)>,
     /// the road table (tiles.sidecar's form), in both ways: the table, or its gzipped base64 made by the caller
     pub side: Option<(&'a Value, Option<&'a str>)>,
     /// the settings of simple mode's recolouring script, when the page is in simple mode
@@ -278,8 +280,10 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
         parts = format!("<script>{}</script>", PMTILES_JS.replace("</script>", "<\\/script>"));       // the roads' archive and the ground's terrain file
     }
     if !p.tiles.is_empty() {
-        let b64: Map<String, Value> = p.tiles.iter()
+        let mut b64: Map<String, Value> = p.tiles.iter()
             .map(|(k, a)| (k.to_string(), base64::engine::general_purpose::STANDARD.encode(crate::tiles::pmtiles::gzip_at(a, 9)).into())).collect();
+        // a file next to the page: the page fetches it at its first read
+        b64.extend(p.tile_files.iter().map(|(k, path)| (k.to_string(), serde_json::json!({"url": path}))));
         parts.push_str(&TILES.replace("__RS_PMTILES__", &script_json(&Value::Object(b64))));
     }
     if let Some((side, side_b64)) = p.side {
@@ -307,7 +311,7 @@ pub fn page_of_json(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>
     let parts = PageParts {
         name: p["name"].as_str().unwrap_or(""), cam, bounds: [b(0), b(1), b(2), b(3)], side_panel_html: p["side_panel_html"].as_str(),
         host_panel_width: p["host_panel_width"].as_f64().unwrap_or(320.0), compress: p["compress"] == true, gz: p["gz"].as_object().cloned(),
-        tiles: pmtiles.map(|a| vec![(crate::tiles::SOURCE, a)]).unwrap_or_default(), side: (p["side_b64"].is_string() || !p["side"].is_null()).then(|| (&p["side"], p["side_b64"].as_str())),
+        tiles: pmtiles.map(|a| vec![(crate::tiles::SOURCE, a)]).unwrap_or_default(), tile_files: Vec::new(), side: (p["side_b64"].is_string() || !p["side"].is_null()).then(|| (&p["side"], p["side_b64"].as_str())),
         simple_js: (!p["simple_js"].is_null()).then_some(&p["simple_js"]), sources: None,
     };
     Ok(page_html(style, &page, &parts))

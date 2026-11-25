@@ -44,6 +44,32 @@ roads. So you can still select a road in a clickable zone. Its popup also lists 
 
 Overlays work only on the web backend (the default).
 
+## Many hidden overlays: keep their data out of the page
+
+A page that has many hidden overlays (for example, one for each height or view) holds the data of all of them, and the HTML file
+becomes large. With `lazy_overlays=True`, the data of each overlay that starts hidden goes into files next to the page: its vector
+tiles (a PMTiles archive) and its rows. While an overlay shows, the map reads only the tiles of the view. The page reads the rows the
+first time that the overlay shows:
+
+```python
+m = rs.render_dashboard(edges, overlays=[rs.Overlay(walls, label="Walls 4 m", visible=False), ...], lazy_overlays=True)
+m.save("site/noise.html")        # writes noise.html and the folder site/rs-files/
+```
+
+- Use `m.save(path)`. If you write `m.html` yourself, also write each file of `m.files` (`{path relative to the page: bytes}`).
+- Serve the page and the folder `rs-files/` from a web server that answers HTTP range requests (nginx, Apache, GitHub Pages, a cloud
+  bucket). Python's `python -m http.server` does not, and the map then shows an error in the console. A browser does not read the files
+  of a page that you open from the disk.
+- Each file name has a hash of its data. Two pages in one folder do not overwrite the files of the other. When you build the page again,
+  delete the old folder `rs-files/` first, or the old files stay.
+- The popup, `color_col`, the legend list and `rs:select` of the overlay work as before. `rsQuery` finds the features of a hidden
+  overlay only after the overlay showed one time.
+- The page must be tiled (`tiles=True`, the default). An overlay that shows at the start stays in the page.
+
+On noise-map's page (Norrmalm, 89 hidden noise overlays), the HTML file is 16.9 MB in place of 48.5 MB. The first load takes 1.9 s
+in place of 2.9 s, and a switch from one wall height to another takes 0.38 s in place of 0.57 s. At zoom 15, the two heights read
+415 kB of the 33.2 MB of files (Chromium, local server, the median of 3 loads, 2026-11-24).
+
 ## Overlays attached to edges
 
 An item that belongs to one road (a lane, a lane marking, a zebra crossing, a sign) must be drawn **at the place of its road**: over

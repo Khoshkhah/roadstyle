@@ -176,10 +176,14 @@ class WebMap:
     """A self-contained MapLibre HTML map. ``.save(path)`` / ``.html`` inline the vendored
     MapLibre (the file opens offline, no CDN); the notebook display swaps in CDN tags instead —
     an inline output must stay small enough for notebook frontends' output limits, and the
-    preview needs the network for its basemap tiles anyway."""
+    preview needs the network for its basemap tiles anyway.
 
-    def __init__(self, html: str):
+    ``files``: the files that go next to the page, {path relative to the page: bytes} (``lazy_overlays=True``; else empty). ``.save(path)``
+    writes them; a caller that writes ``.html`` itself must write them too."""
+
+    def __init__(self, html: str, files=()):
         self._tpl = html                     # full page, MapLibre still a placeholder
+        self.files = dict(files)
 
     @property
     def html(self) -> str:
@@ -191,6 +195,10 @@ class WebMap:
     def save(self, path):
         from pathlib import Path
         Path(path).write_text(self.html, encoding="utf-8")
+        for rel, data in self.files.items():
+            f = Path(path).parent / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(data)
         return path
 
     def _repr_html_(self):

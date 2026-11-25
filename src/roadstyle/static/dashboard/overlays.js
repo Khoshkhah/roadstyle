@@ -22,12 +22,16 @@ export const _lookHolds = new Set();
 // per overlay (its topmost hit). Feeds rs:select's `overlays` payload and the popup/panel.
 // A layer's popup fields are not in its tiles: its props file (roadstyle:interaction.base_props, by source) holds them by row, the feature id.
 const _ovRows = {};
-// A page that is one HTML file (way A) holds the file as a `data:application/gzip` URL, which this inflates; any other URL is JSON.
-const _ovJson = r => r.url.startsWith("data:application/gzip") ? new Response(r.body.pipeThrough(new DecompressionStream("gzip"))).json() : r.json();
+// A page that is one HTML file (way A) holds the file as a `data:application/gzip` URL; with lazy_overlays=True it is a .json.gz file next to the page.
+// Gzipped JSON is inflated (a web server can give the file inflated already: then it has no gzip header); else it is JSON.
+const _ovJson = r => { if(!r.ok) throw new Error(r.url+": HTTP "+r.status); return r.arrayBuffer().then(b => { const u = new Uint8Array(b);
+  return u[0]===0x1f && u[1]===0x8b ? new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("gzip"))).json() : JSON.parse(new TextDecoder().decode(u)); }); };
 // The rows are also the overlay's features for rsQuery, rsGetProps and rsFocus (`OV_ROWS`: the row is the feature's properties, `__rs_bbox` its box).
-function _ovFetch(ov){ if(ov.props && !_ovRows[ov.props]) fetch(ov.props).then(_ovJson).then(j=>{
+// The rows in a file (lazy_overlays=True) are fetched when the overlay first shows (rsSetOverlay); the rows in the page at the start.
+function _ovFetch(ov){ if(ov.props && !(ov.props in _ovRows)){ _ovRows[ov.props] = undefined; fetch(ov.props).then(_ovJson).then(j=>{
   _ovRows[ov.props] = j; OV_ROWS.set(ov.source, j.map((r, i) => ({id: i, properties: r, bbox: r.__rs_bbox}))); },
-  e=>console.error("overlay rows:", e)); }
+  e=>console.error("overlay rows:", e)); } }
+const _ovInFile = ov => !!ov.props && !ov.props.startsWith("data:");
 // an item's fields: its tile properties and its row, without roadstyle's own keys (__rs_bbox, ...): the popup, the panel and rs:select show the data only
 const _ovProps = (ov, f) => Object.fromEntries(Object.entries({...f.properties, ...(_ovRows[ov.props] || [])[f.id]}).filter(([k]) => !k.startsWith("__rs")));
 export function _ovAt(pt){
@@ -88,6 +92,7 @@ export function rsSetOverlay(labelOrIdx, on){
   const ov = OVERLAYS[i]; if(!ov) return;
   _ovAllLayers(ov).forEach(id=>map.setLayoutProperty(id,"visibility", on?"visible":"none"));
   ov.visible = !!on;
+  if(on) _ovFetch(ov);
   on ? _ovOff.delete(ov.label) : _ovOff.add(ov.label);
   if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;
   _emit("rs:overlaychange", {overlay:ov.label, visible:!!on});
@@ -150,7 +155,7 @@ export function useOverlays(){
   _OV_POPUP = O.overlay_popup;
   clearOvSel(); _ovHov = null; _ovUnder = null;
   if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
-  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; _ovFetch(ov); ov.layers.forEach(_ovBind); if(_ovGroupOff || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
+  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); ov.layers.forEach(_ovBind); if(_ovGroupOff || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
   window.RS_OVERLAYS = OVERLAYS;
   _ovBoxRows();
   _emit("rs:overlayschange", {visible: rsGetOverlays()});       // the base-map box and the legend box read the layers again

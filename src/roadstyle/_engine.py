@@ -420,9 +420,9 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     kwargs = vehicles_option(kwargs)
     lk, o = _look_and_options({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col,
                                "state": "live"})
-    html = rust().page_from(_arrow(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings, lk, o["args"])))
+    html, files = rust().page_from(_arrow(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings, lk, o["args"])))
     _warn()
-    return rw.WebMap(html)
+    return rw.WebMap(html, files)
 
 
 def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=None) -> dict:

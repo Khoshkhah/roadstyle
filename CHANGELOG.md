@@ -8,6 +8,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 
+- **The data of hidden overlays in files next to the page: `lazy_overlays=True`.** The vector tiles and the rows of each overlay that starts hidden go into `rs-files/` next to the page (one PMTiles archive and one gzipped JSON file for each overlay, the name with a hash of the data). While the overlay shows, the map reads only the tiles of the view (HTTP range requests); the page reads the rows when the overlay first shows. `WebMap.save` writes the files, and `WebMap.files` gives them. On noise-map's page: 48.5 MB in 16.9 MB, first load 2.9 s in 1.9 s, a wall-height switch 0.57 s in 0.38 s. Docs: [Many hidden overlays](docs/guides/overlays.md#many-hidden-overlays-keep-their-data-out-of-the-page), [tiling](docs/design/tiling.md#overlays-in-files-2026-11-24). Test: `tests/test_overlay_tiles_browser.py`. The Python binding's `page_from` gives `(html, files)` in place of `html`.
+
 - **Your own base-map theme.** `rs.duckosm.page(db, theme="noise")` reads `./themes/noise.yaml` (then `~/.config/roadstyle/themes/`), as a palette is read. With `extends: grey`, the file states only what it changes over that theme. `rs.duckosm.theme` reads it too. Docs: [Base-map themes](docs/reference/settings.md#base-map-themes). Tests: `basemap.rs` (`own_themes_extend_a_theme`) and `tests/test_duckosm.py`.
 
 - **A nightly wheel** (`.github/workflows/nightly.yml`): each merge to main that changes the package puts a Linux x86_64 wheel, with the vehicles module in it, in the GitHub pre-release `nightly`, in place of the old one. Its version is `<version>+nightly.<run>`. Nothing goes to PyPI. How to install it: `docs/get-started.md`.

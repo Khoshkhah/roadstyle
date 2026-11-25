@@ -338,6 +338,9 @@ mod wasm {
         let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e.to_string()))?;
         let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e.to_string()))?;
         page.warnings.iter().for_each(|w| console_warn(w));
+        if !page.files.is_empty() {
+            return Err(JsError::new("lazy_overlays=True: the page has files next to it, which the page of the browser engine cannot write"));
+        }
         Ok(page.html)
     }
 

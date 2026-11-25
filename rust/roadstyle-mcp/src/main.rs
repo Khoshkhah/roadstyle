@@ -262,6 +262,7 @@ fn render_file(a: RenderFile) -> Result<(String, PathBuf), String> {
         std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
     }
     std::fs::write(&out, &html).map_err(|e| format!("{}: {e}", out.display()))?;
+    page.write_files(out.parent().unwrap_or(std::path::Path::new(".")))?;
     // the warnings once each, in order
     let mut warnings: Vec<String> = read_warning.into_iter().chain(page.warnings).collect();
     warnings.dedup();

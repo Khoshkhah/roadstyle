@@ -2,8 +2,15 @@
 (function(){
   // the archives by source: `roads` and one for each overlay (docs/design/tiling.md). Each is one gzip stream (its tiles are not gzipped one by
   // one: the stream is a fifth smaller), inflated at its first read: an overlay's archive when the overlay first shows; a read waits for it
+  // An archive is base64 in the page, or {url} (lazy_overlays=True): a PMTiles file next to the page, of which MapLibre reads only the tiles of the
+  // view (HTTP range requests), and only while the overlay shows
   var all=__RS_PMTILES__, proto=new pmtiles.Protocol(), roads=null;
   function archive(name){
+    if(typeof all[name]!=="string"){
+      var fs=new pmtiles.FetchSource(all[name].url), f=new pmtiles.PMTiles({getKey:function(){return name;}, getBytes:fs.getBytes.bind(fs)});
+      proto.add(f);
+      return f;
+    }
     var ready=null;
     function inflate(){
       if(!ready){
@@ -19,7 +26,7 @@
     proto.add(a);
     return a;
   }
-  var bytes=all.roads ? Math.floor(all.roads.length*3/4) : 0;
+  var bytes=typeof all.roads==="string" ? Math.floor(all.roads.length*3/4) : 0;
   Object.keys(all).forEach(function(name){ var a=archive(name); if(name==="roads") roads=a; });
   maplibregl.addProtocol("pmtiles", proto.tile);
   window.__rs_tiles={ok:true, bytes:bytes, archives:Object.keys(all)};

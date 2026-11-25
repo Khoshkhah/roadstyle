@@ -65,6 +65,37 @@ pays this only while it shows. A hidden overlay that started shown stays in `roa
 **Not done:** the map worker (`rs://`), `export_style` and `roadstyle tiles` keep every overlay in `roads`. The page of noise-map uses the
 embedded archive.
 
+## Overlays in files (2026-11-24)
+
+With `lazy_overlays=True`, the archive of each overlay that has its own source (above) is a PMTiles file next to the page, not base64 in the page.
+The rows of the overlay (`roadstyle:interaction.base_props`) are a file too. `page_options::tiled_page` makes them (`PageFile`), `Page.files` gives
+them, and `WebMap.save` (Python), `roadstyle page` (CLI) and the MCP server write them. The engine in the browser (wasm) cannot write files: there,
+`lazy_overlays=True` is an error.
+
+| File | Format | The page reads it |
+|---|---|---|
+| `rs-files/ovN-<hash>.pmtiles` | The overlay's PMTiles archive, its MLT tiles gzipped one by one | `tiles.html`: `pmtiles.FetchSource`, a range request for the header and for each tile of the view, while the overlay shows |
+| `rs-files/ovN-<hash>.json.gz` | The overlay's rows (`crate::rows_file`), gzipped | `overlays.js` (`_ovFetch`), when `rsSetOverlay` first shows the overlay |
+
+**Why tiles.** The map reads only the tiles of the view, at the zoom of the view, and only while the overlay shows: the same tiles, cut by the same
+engine, as the archives in the page. A GeoJSON or FlatGeobuf file makes MapLibre cut the features in the browser (on the noise page, 1 M vertices of
+surface). One archive for each overlay, not one archive with a tile layer for each overlay: MapLibre's MLT reader decodes every layer of a tile
+(above), so one archive would decode all heights to show one. The tiles are gzipped one by one, because a range request reads one tile: the files
+are 33.2 MB against 23.7 MB as gzip streams of whole archives. The rows stay one file: `rsQuery`, `rsFocus` and the popup read them by the
+feature id. The hash in a name keeps the files of two pages in one folder apart, and a browser can keep a file in its cache.
+
+**A web server with range requests is necessary.** `fetch` does not read a `file://` address, and `FetchSource` stops with an error when the
+server gives the whole file (`python -m http.server`). A server that gives the `.json.gz` file with `Content-Encoding: gzip` gives it inflated: the
+page inflates only bytes that start with the gzip header.
+
+**Measured** on noise-map's page (89 hidden overlays; Chromium, a local server with range requests, the median of 3 loads; the height switch at
+zoom 15: the walls at 1.5 m off, at 4 m on, until the tiles are loaded):
+
+| Page | HTML | Files | First load (map loaded, tiles loaded) | First show of the walls | Height switch | Bytes read for the two heights |
+|---|---|---|---|---|---|---|
+| Overlays in the page | 48.5 MB | none | 2.92 s | 355 ms | 570 ms | none (in the page) |
+| `lazy_overlays=True` | 16.9 MB | 178 files, 33.2 MB | 1.87 s | 324 ms | 382 ms | 415 kB |
+
 ## Why these values (Nacka, 22,191 roads, measured 2026-10-29)
 
 The embedded archive, the tiles of one page:
