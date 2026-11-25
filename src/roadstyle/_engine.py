@@ -175,6 +175,12 @@ def _look_and_options(kwargs, base_map=None):
     if kwargs.get("boundary") is not None:   # a shapely geometry or a GeoDataFrame: GeoJSON, as render does (_boundary_fc)
         from .render_web import _boundary_fc
         kwargs["boundary"] = json.loads(json.dumps(_boundary_fc(kwargs["boundary"])))
+    lim = kwargs.get("boundary_limit")
+    if hasattr(lim, "tolist") and not hasattr(lim, "to_crs"):         # a numpy box
+        lim = kwargs["boundary_limit"] = lim.tolist()
+    if lim is not None and not isinstance(lim, (bool, tuple, list)):   # the area of the limit (a shapely geometry, a GeoDataFrame): GeoJSON; the page writer takes its box
+        from .render_web import _boundary_fc
+        kwargs["boundary_limit"] = json.loads(json.dumps(_boundary_fc(lim)))
     # the settings in force (roadstyle.json, $ROADSTYLE_CONFIG, use_settings), then the call's, as render_edges stacks them
     from . import _settings as _s
     given = _settings_data(settings)

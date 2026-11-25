@@ -538,11 +538,38 @@ pub struct BoundaryRules {
     pub limit_pad: f64,
     /// and the lowest zoom is this many levels under the zoom at which the whole boundary fits the window
     pub zoom_out: f64,
+    /// the box of the limit's area [west, south, east, north]: the page writer sets it from `boundary_limit` (true: the box of `boundary`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bounds: Option<[f64; 4]>,
+}
+
+/// The box [west, south, east, north] of a GeoJSON area (a geometry, a Feature or a FeatureCollection); None with no coordinate.
+pub fn boundary_bounds(b: &Value) -> Option<[f64; 4]> {
+    fn coords(c: &Value, bx: &mut [f64; 4]) {
+        let Some(a) = c.as_array() else { return };
+        if let (Some(x), Some(y)) = (a.first().and_then(Value::as_f64), a.get(1).and_then(Value::as_f64)) {
+            *bx = [bx[0].min(x), bx[1].min(y), bx[2].max(x), bx[3].max(y)];
+        } else {
+            a.iter().for_each(|x| coords(x, bx));
+        }
+    }
+    fn walk(v: &Value, bx: &mut [f64; 4]) {
+        match v["type"].as_str() {
+            Some("FeatureCollection") => v["features"].as_array().into_iter().flatten().for_each(|f| walk(f, bx)),
+            Some("Feature") => walk(&v["geometry"], bx),
+            Some("GeometryCollection") => v["geometries"].as_array().into_iter().flatten().for_each(|g| walk(g, bx)),
+            Some(_) => coords(&v["coordinates"], bx),
+            None => {}
+        }
+    }
+    let mut bx = [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
+    walk(b, &mut bx);
+    (bx[0] <= bx[2] && bx[1] <= bx[3]).then_some(bx)
 }
 
 impl BoundaryRules {
     fn new() -> BoundaryRules {
-        BoundaryRules { dim: false, limit: false, dim_light: 0.16, dim_dark: 0.4, limit_pad: 2.0, zoom_out: 3.0 }
+        BoundaryRules { dim: false, limit: false, dim_light: 0.16, dim_dark: 0.4, limit_pad: 2.0, zoom_out: 3.0, bounds: None }
     }
 }
 
