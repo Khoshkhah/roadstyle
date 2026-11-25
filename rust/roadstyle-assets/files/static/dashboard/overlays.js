@@ -127,6 +127,8 @@ export function rsSetOverlay(labelOrIdx, on){
   const i = typeof labelOrIdx==="number" ? labelOrIdx : OVERLAYS.findIndex(o=>o.label===labelOrIdx);
   const ov = OVERLAYS[i]; if(!ov) return;
   if(_ovLazyOf(ov)) on ? _ovLazyAdd(ov) : _ovLazyRemove(ov);
+  if(on) ov.layers.forEach(_ovBind);
+  else { if(_ovHov && _ovHov.ov === ov){ _ovState(_ovHov, {hover:false}); _ovHov = null; if(_ovTip) _ovTip.remove(); } ov.layers.forEach(_ovUnbind); }
   _ovAllLayers(ov).forEach(id=>map.setLayoutProperty(id,"visibility", on?"visible":"none"));
   ov.visible = !!on;
   if(on) _ovFetch(ov);
@@ -141,7 +143,9 @@ function _ovRow(ov, rule){
 }
 // the hover tooltip and the hover glow of an overlay's layer, made once for each layer id of the map: the handlers find the overlay of the layer
 // at each move, so a layer that a later style brings (the same ids) has the overlay of the new style
-const _ovBound = new Set();
+// Only a shown overlay has them: MapLibre runs a query of each layer that has a handler at each mouse move, and noise-map's page, with handlers on all
+// 4,883 layers of its 1,215 overlays, took 4 s for one mouse move (2026-11-25). rsSetOverlay binds them when the overlay shows and takes them away when it hides.
+const _ovBound = new Map();     // layer id -> its mousemove and mouseleave handlers
 const _ovOfLayer = id => OVERLAYS.find(o=>o.layers.includes(id));
 // rsSetInteraction can make a layer clickable, or give it its tooltip, later; the handlers read ov.interactive and ov.tooltip on each move
 // rsSetTooltip(label, fn) (rs.tooltip): the hover tooltip of an overlay, made by the page: fn(properties) gives {title, rows: [[name, value], ...]} (the
@@ -157,8 +161,7 @@ const _ovTipHtml = t => [t.title != null && t.title !== "" ? "<b>" + _esc(t.titl
 const _ovTips = ov=>!!_ovTipFn[ov.label] || ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   // true: every field (rsSetInteraction, a layer with no list)
 function _ovBind(id){
   if(_ovBound.has(id)) return;
-  _ovBound.add(id);
-  map.on("mousemove", id, e=>{ if(_NO_HOVER.matches) return; const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
+  const move = e=>{ if(_NO_HOVER.matches) return; const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
     map.getCanvas().style.cursor = ov.interactive ? "pointer" : "";   // hover -> recolour, once the mouse rests on it (_TIP_DELAY)
     const f = e.features && e.features[0]; if(!f) return;
     const k={source:f.source, sourceLayer:f.sourceLayer, id:f.id, ov}, same=o=>!!o && o.source===k.source && o.sourceLayer===k.sourceLayer && o.id===k.id;
@@ -170,10 +173,17 @@ function _ovBind(id){
       if(_ovTip && _ovTips(ov)){
         const fn = _ovTipFn[ov.label], t = fn ? fn(props) : null;          // the page's own tooltip (rs.tooltip), else the overlay's fields
         const html = fn ? (t ? _ovTipHtml(t) : "") : _rfields(props, ov.tooltip===true ? null : ov.tooltip);
-        if(html){ _ovTip.setLngLat(ll).setHTML(html); if(!_ovTip.isOpen()) _ovTip.addTo(map); } else _ovTip.remove(); } }, _TIP_DELAY); });
-  map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor=""; clearTimeout(_ovT); _ovUnder=null;
+        if(html){ _ovTip.setLngLat(ll).setHTML(html); if(!_ovTip.isOpen()) _ovTip.addTo(map); } else _ovTip.remove(); } }, _TIP_DELAY); };
+  const leave = ()=>{ map.getCanvas().style.cursor=""; clearTimeout(_ovT); _ovUnder=null;
     _ovState(_ovHov,{hover:false}); _ovHov=null;
-    if(_ovTip) _ovTip.remove(); });
+    if(_ovTip) _ovTip.remove(); };
+  map.on("mousemove", id, move); map.on("mouseleave", id, leave);
+  _ovBound.set(id, [move, leave]);
+}
+function _ovUnbind(id){
+  const h = _ovBound.get(id); if(!h) return;
+  map.off("mousemove", id, h[0]); map.off("mouseleave", id, h[1]);
+  _ovBound.delete(id);
 }
 // The Layers box: one row for each overlay, in the panel's Roads card (panel mode) or in a box of its own; a new style takes the rows of the old one away
 // and brings its own (a box with no row is taken away). The labels that the person turned off stay off.
@@ -208,7 +218,7 @@ export function useOverlays(){
   _ovLazyCalls();
   clearOvSel(); _ovHov = null; _ovUnder = null;
   if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
-  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); ov.layers.forEach(_ovBind); if((_ovGroupOff && _ovGroup().includes(ov)) || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
+  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); if(ov.visible0) ov.layers.forEach(_ovBind); if((_ovGroupOff && _ovGroup().includes(ov)) || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
   window.RS_OVERLAYS = OVERLAYS;
   _ovBoxRows();
   _emit("rs:overlayschange", {visible: rsGetOverlays()});       // the base-map box and the legend box read the layers again

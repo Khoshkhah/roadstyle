@@ -297,6 +297,9 @@ def test_a_thousand_hidden_overlays_are_not_in_the_starting_style(tmp_path):
         try:
             st = page.evaluate("(() => { const s = map.getStyle(); return {layers: s.layers.length, sources: Object.keys(s.sources).length, lazy: Object.keys(O.overlay_layers.sources).length}; })()")
             assert st["lazy"] == n and st["layers"] < 60 and st["sources"] < 10, st
+            moves = "(map._delegatedListeners.mousemove || []).length"     # MapLibre queries each layer with a handler at each mouse move
+            at_load = page.evaluate(moves)
+            assert at_load < 20, at_load
             src = page.evaluate("RS_OVERLAYS.find(o => o.label === 'cell 0').source")
             lid = page.evaluate(f"O.overlay_layers.sources['{src}'].layers[0].id")
             page.evaluate(f"map.setPaintProperty('{lid}', 'fill-color', '#ff0000')")              # a page's change while the overlay is out
@@ -316,10 +319,41 @@ def test_a_thousand_hidden_overlays_are_not_in_the_starting_style(tmp_path):
             page.mouse.click(x, y)
             page.wait_for_function("window.__sel", timeout=5_000)
             assert page.evaluate("window.__sel.overlay") == "cell 0" and page.evaluate("window.__sel.properties.k") == 0
+            assert page.evaluate(moves) <= at_load + 2                          # zones off, cell 0 on
             page.evaluate("rsSetOverlay('cell 0', false)")
             assert page.evaluate(f"[!!map.getSource('{src}'), !!map.getLayer('{lid}')]") == [False, False]
+            assert page.evaluate(moves) < at_load                               # hidden: no handler
             page.evaluate("rsSetOverlay('cell 0', true)")                    # again: its definition kept the change
             assert page.evaluate(f"map.getPaintProperty('{lid}', 'fill-color')") == "#ff0000"
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_a_zoom_or_a_jump_during_the_move_back_into_the_boundary_breaks_nothing(tmp_path):
+    """boundary_limit: a pan past the edge starts a move back; a zoom and a jump during it stop it. Before, the move back started inside the
+    moveend that stop() fires, and MapLibre's render loop threw at each frame (a blank map that did not move again); and a center a rounding outside
+    the limits eased for ever. Now: no page error, and the map is still after a second."""
+    from shapely.geometry import box
+    path = tmp_path / "e.html"
+    rs.render_dashboard(_edges(), basemap="blank", boundary=box(17.999, 59.299, 18.006, 59.311), boundary_limit=True).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        try:
+            page.wait_for_function("map.getMinZoom() > 5", timeout=10_000)
+            for _ in range(3):
+                page.evaluate("map.jumpTo({center: [18.2, 59.4]})")                     # past the edge: the move back starts
+                page.wait_for_timeout(60)
+                page.evaluate("map.zoomTo(map.getZoom() + 0.5, {duration: 80})")       # stops the move back
+                page.wait_for_timeout(20)
+                page.evaluate("map.jumpTo({center: [18.003, 59.305]})")
+                page.wait_for_timeout(40)
+            page.evaluate("map.easeTo({center: [18.1, 59.305], duration: 100})")     # to the edge: the center ends at the limit
+            page.wait_for_timeout(1500)
+            assert page.evaluate("map.isMoving()") is False
+            page.evaluate("map.zoomTo(map.getZoom() + 1, {duration: 0})")           # the map still moves
+            assert page.evaluate("map.isMoving()") is False
         finally:
             browser.close()
     assert errors == []
