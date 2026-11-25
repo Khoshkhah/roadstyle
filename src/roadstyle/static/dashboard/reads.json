@@ -8,7 +8,8 @@
     "lvl",
     "__rs_lvl",
     "__rs_access",
-    "__rs_pick"
+    "__rs_pick",
+    "__rs_tunnel"
   ],
   "decks": [
     "__rs_edges",

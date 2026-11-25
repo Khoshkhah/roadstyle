@@ -40,7 +40,9 @@ are in the base map box and the legend box of the toolbox ([Layout and toolbox](
 `rsSetOverlay("Zones", false)` hides a layer, by its label or its index ([JavaScript API](../reference/javascript.md)).
 
 A click goes to the layer on top: first an `"over"` overlay, then the roads, then an `"under"` overlay only where the click misses all
-roads. So you can still select a road in a clickable zone. Its popup also lists the zones under the click.
+roads. So you can still select a road in a clickable zone. Its popup also lists the zones under the click. A tunnel is under the
+ground: an `"under"` overlay over it (a building, a zone) gets the hover and the click there. While the 3D buildings show, their 3D
+layer is on top, and the click goes to the building that the pointer is on. The hover follows the same order.
 
 Overlays work only on the web backend (the default).
 
