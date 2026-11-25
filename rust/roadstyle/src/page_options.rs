@@ -725,7 +725,7 @@ enum FileKind {
     Rows,
 }
 
-/// A file of a page with `lazy_overlays=True`: the archive or the rows of an overlay, gzipped, at `path` (relative to the page).
+/// A file of a page with `lazy_overlays=True`: the archive (its tiles gzipped) or the gzipped rows of an overlay, at `path` (relative to the page).
 struct PageFile {
     source: String,
     kind: FileKind,
@@ -733,18 +733,18 @@ struct PageFile {
     bytes: Vec<u8>,
 }
 
-/// `bytes` (gzipped already) as a page file of `source`. The name has a hash of the bytes: two pages in one folder do not overwrite the file of the
+/// `bytes` as a page file of `source` (the rows gzipped already). The name has a hash of the bytes: two pages in one folder do not overwrite the file of the
 /// other, and a browser can keep a file in its cache.
 fn page_file(source: &str, kind: FileKind, bytes: Vec<u8>) -> PageFile {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     bytes.hash(&mut h);
-    let ext = if kind == FileKind::Tiles { "pmtiles.gz" } else { "json.gz" };
+    let ext = if kind == FileKind::Tiles { "pmtiles" } else { "json.gz" };
     PageFile { path: format!("{FILES_DIR}/{source}-{:016x}.{ext}", h.finish()), source: source.into(), kind, bytes }
 }
 
-/// `lazy`: the archive and the rows of each overlay with its own source (each hidden overlay) go into files next to the page, which the page fetches
-/// when the overlay first shows (docs/design/tiling.md, "Overlays in files"). The page has only their paths.
+/// `lazy`: the archive and the rows of each overlay with its own source (each hidden overlay) go into files next to the page (docs/design/tiling.md,
+/// "Overlays in files"): the page reads the tiles of the view from the archive while the overlay shows, and the rows when it first shows.
 fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>, lazy: bool) -> Result<(Value, Archives, Vec<PageFile>), crate::Error> {
     let c = &look.map.columns;
     let hw = Some(c.class.as_str()).filter(|h| !h.is_empty()).unwrap_or("highway");
@@ -766,7 +766,8 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>, lazy: bool) -> Re
     // an overlay whose layers make no tile at any zoom (its style hides it at every tile zoom) has no archive: it stays in `roads`
     let mut archives = Vec::new();
     for k in overlay_sources(&style).into_iter().filter(|k| names.contains(k)) {
-        match t.archive_of(bounds, std::slice::from_ref(&k), true) {
+        // a file (lazy): its tiles gzipped one by one, for a read of one tile; in the page: plain, as the page gzips the whole archive
+        match t.archive_of(bounds, std::slice::from_ref(&k), !lazy) {
             Ok(a) => archives.push((k, a)),
             Err(crate::tiles::Error::Empty) => {}
             Err(e) => return Err(e.into()),
@@ -789,7 +790,7 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>, lazy: bool) -> Re
     let mut files: Vec<PageFile> = Vec::new();
     if lazy {
         // the archives that are left here are the hidden overlays' own (own_sources): roads goes in below
-        files.extend(archives.drain(..).map(|(k, a)| page_file(&k, FileKind::Tiles, crate::tiles::pmtiles::gzip_at(&a, 9))));
+        files.extend(archives.drain(..).map(|(k, a)| page_file(&k, FileKind::Tiles, a)));
     }
     archives.insert(0, (crate::tiles::SOURCE.to_string(), roads));
     // the rows of each overlay (all its properties and its box): the tiles have only the keys that the style reads

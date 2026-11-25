@@ -1,29 +1,23 @@
 <script>
 (function(){
   // the archives by source: `roads` and one for each overlay (docs/design/tiling.md). Each is one gzip stream (its tiles are not gzipped one by
-  // one: the stream is a fifth smaller), inflated at its first read: an overlay's archive when the overlay first shows; a read waits for it.
-  // An archive is base64 in the page, or {url} (lazy_overlays=True): a file next to the page, fetched at its first read
+  // one: the stream is a fifth smaller), inflated at its first read: an overlay's archive when the overlay first shows; a read waits for it
+  // An archive is base64 in the page, or {url} (lazy_overlays=True): a PMTiles file next to the page, of which MapLibre reads only the tiles of the
+  // view (HTTP range requests), and only while the overlay shows
   var all=__RS_PMTILES__, proto=new pmtiles.Protocol(), roads=null;
-  function gunzip(arr){       // a web server can give a .gz file inflated already (Content-Encoding: gzip): then it has no gzip header
-    return arr[0]===0x1f && arr[1]===0x8b ? new Response(new Blob([arr]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer() : arr.buffer;
-  }
   function archive(name){
+    if(typeof all[name]!=="string"){
+      var fs=new pmtiles.FetchSource(all[name].url), f=new pmtiles.PMTiles({getKey:function(){return name;}, getBytes:fs.getBytes.bind(fs)});
+      proto.add(f);
+      return f;
+    }
     var ready=null;
     function inflate(){
       if(!ready){
-        var v=all[name];
+        var b=atob(all[name]), arr=new Uint8Array(b.length);
+        for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
         all[name]=null;
-        if(typeof v==="string"){
-          var b=atob(v), arr=new Uint8Array(b.length);
-          for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
-          ready=Promise.resolve(gunzip(arr));
-        }else{
-          ready=fetch(v.url).then(function(r){
-            if(!r.ok) throw new Error("overlay tiles: "+v.url+": HTTP "+r.status);
-            return r.arrayBuffer();
-          }).then(function(b){ return gunzip(new Uint8Array(b)); });
-          ready.catch(function(e){ console.error(e); });
-        }
+        ready=new Response(new Blob([arr]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
       }
       return ready;
     }
