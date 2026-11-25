@@ -428,10 +428,9 @@ def test_the_page_draws_the_base_maps_textures_and_icons(tmp_path):
     assert not [t for k, t in console if "could not be loaded" in t or "could not be read" in t], console
 
 
-def test_a_base_map_with_tiles_replaces_the_areas_own_base_map_layers(tmp_path):
-    """The area's own base map (duckOSM's base-map layers, `base_map` in the overlays) shows over a blank base map. A base map with tiles or a style
-    replaces it: its layers are off while that base map shows, and come back with a blank one. The page's own overlays stay on. A key that is not a
-    base map of the page is an error that lists them (before, rsSetBasemap returned and nothing changed)."""
+def test_the_base_map_layers_are_marked_and_a_wrong_base_map_key_is_an_error(tmp_path):
+    """The area's own base-map layers carry `base_map` in the page's overlays (the base-map box's one switch takes them), the page's own do not. A key that
+    is not a base map of the page is an error that lists them (before, rsSetBasemap returned and nothing changed)."""
     pw = pytest.importorskip("playwright.sync_api")
     import shapely
 
@@ -446,20 +445,13 @@ def test_a_base_map_with_tiles_replaces_the_areas_own_base_map_layers(tmp_path):
         pg = browser.new_page()
         errors = []
         pg.on("pageerror", lambda e: errors.append(str(e)))
-        pg.route("https://**/*", lambda r: r.abort())                 # no tile from the network: the test reads the layers' state only
+        pg.route("https://**/*", lambda r: r.abort())
         pg.goto(out.as_uri())
         pg.wait_for_function("window.map && map.loaded && map.loaded() && window.RS_OVERLAYS", timeout=120000)
-        state = lambda: pg.evaluate("Object.fromEntries(RS_OVERLAYS.map(o => [o.label, [!!o.base_map, o.visible]]))")  # noqa: E731
-        assert state() == {"water": [True, True], "Walls": [False, True]}, state()
-        keys = pg.evaluate("RS_BASEMAPS.map(b => b.key)")
-        raster = next(k for k in keys if pg.evaluate("k => RS_BASEMAPS.find(b => b.key === k).tiles.length > 0", k))
-        pg.evaluate("k => rsSetBasemap(k)", raster)
-        assert state() == {"water": [True, False], "Walls": [False, True]}
-        assert pg.evaluate("map.getLayoutProperty('ov0-fill', 'visibility')") == "none"
-        pg.evaluate("k => rsSetBasemap(k)", keys[0])                 # the blank base map of the start
-        assert state() == {"water": [True, True], "Walls": [False, True]}
+        assert pg.evaluate("Object.fromEntries(RS_OVERLAYS.map(o => [o.label, !!o.base_map]))") == {"water": True, "Walls": False}
+        first = pg.evaluate("RS_BASEMAPS[0].key")
         msg = pg.evaluate("(() => { try { rsSetBasemap('ofm_nothing'); } catch(e) { return e.message; } })()")
-        assert "not a base map of this page" in msg and keys[0] in msg, msg
+        assert "not a base map of this page" in msg and first in msg, msg
         browser.close()
     assert errors == []
 
