@@ -122,7 +122,7 @@ marks! {
     /// the twin's row
     Twin = "__rs_twin";
     Bridge = "__rs_bridge";
-    Tunnel = "__rs_tunnel";
+    Tunnel = "__rs_tunnel" [Pieces];
     /// the road's own colour (color_table)
     Color = "__rs_color";
     /// the fill of the active colour option (bake_props)
