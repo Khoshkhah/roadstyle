@@ -50,8 +50,10 @@ Overlays work only on the web backend (the default).
 
 A page that has many hidden overlays (for example, one for each height or view) holds the data of all of them, and the HTML file
 becomes large. With `lazy_overlays=True`, the data of each overlay that starts hidden goes into files next to the page: its vector
-tiles (a PMTiles archive) and its rows. While an overlay shows, the map reads only the tiles of the view. The page reads the rows the
-first time that the overlay shows. The page's own tiles (the roads, the base map and the boundary) also go into a file there
+tiles (a PMTiles archive) and its rows. While an overlay shows, the map reads only the tiles of the view. The page reads the rows of
+an overlay that has a popup, a click or a hover tooltip the first time that the overlay shows. It reads the rows of another overlay
+(`popup=[]`, no tooltip) only at the first `rsQuery`, `rsGetProps` or `rsFocus` on it. That call answers from the rows that the page
+has (none at first), and the event `rs:overlayrows` tells when the rows are in. The page's own tiles (the roads, the base map and the boundary) also go into a file there
 (`rs-files/roads-<hash>.pmtiles`), so the HTML file holds no tiles at all and the map reads only the tiles of the view:
 
 ```python
