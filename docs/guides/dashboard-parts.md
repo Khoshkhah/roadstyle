@@ -689,11 +689,16 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
     rs.slider(document.getElementById("speed"), {label: "Speed limit", min: 0, max: 130, step: 10, value: 50, unit: "km/h",
                                                    onInput: v => preview(v), onChange: v => apply(v)});
     rs.slider(document.getElementById("flow"), {label: "Flow", min: 0, max: 2000, step: 50, value: [300, 1200], unit: "veh/h"});   // two handles
+    const HEIGHTS = [1.5, 4, 7, 10, 13, 16, 19, 22, 25];
+    rs.slider(document.getElementById("height"), {label: "Height above the ground", min: 0, max: 8, value: 1,
+                                                    format: i => HEIGHTS[i] + " m", onChange: i => showHeight(HEIGHTS[i])});   // 9 steps: a label at each
     ```
 
 ??? info "Details"
 
     - The value is at the right of the label. `onInput` comes while the handle moves, `onChange` at the release. With `value: [a, b]` the slider has two handles, and they do not cross. `format(v)` gives the text of a value (default: the value and the unit). It is the browser's range input, so the arrow keys, Home and End work. It gives `{value(), set(v, quiet)}`.
+    - A press on the track (a click, a pen or a finger) moves the handle to the step there; the handle then follows the pointer until the release. With two handles, the nearest one moves. `onChange` comes one time, at the release, and only when the value changed.
+    - A slider of 12 steps or fewer has a small mark at each step, with its `format` label under the track. The label of the value is in the accent colour. A press on a label selects its step. `ticks: false` takes the marks away.
 
 ### A number field { .rs-part }
 

@@ -3,6 +3,10 @@
 // of a slider); a slider's `onInput(v)` comes while it moves.
 //   rs.slider(el, {label: "Speed", min: 0, max: 130, step: 10, value: 50, unit: "km/h", onChange})
 //   rs.slider(el, {label: "Hours", min: 0, max: 23, value: [7, 9], format: v => v + ":00"})
+//   rs.slider(el, {label: "Height", min: 0, max: 8, value: 3, format: i => HEIGHTS[i] + " m", ticks: false})   // ticks: false: no marks under the track
+// A press on the track (mouse, pen or touch) moves the nearest handle to the step there, and the handle follows the pointer until it is released: onChange
+// once, at the release. A slider of 12 steps or fewer has a mark with its `format` label at each step; a press on a label selects its step. The keys
+// arrow left and right, Home and End are the range input's own.
 //   rs.number(el, {label: "Lanes", min: 1, max: 8, value: 2})
 //   rs.number(el, {label: "Buffer", min: 0, step: 50, unit: "m", snap: false})   // snap: false keeps a typed 120; the - and + buttons still add and take 50
 //   const n = rs.number(el, {disabled: true}); n.disabled(false)                 // a field that is off: the box and the - and + buttons
@@ -15,7 +19,8 @@ export function rsSlider(el, opts = {}){
   const two = Array.isArray(opts.value), min = opts.min ?? 0, max = opts.max ?? 100, step = opts.step ?? 1;
   const fmt = opts.format || (v => v + (opts.unit ? " " + opts.unit : ""));
   el.classList.add("rs-slider"); el.classList.toggle("rs-slider-two", two);
-  el.innerHTML = _fdHead("rs-slider") + '<div class="rs-slider-track"><div class="rs-slider-fill"></div></div>';
+  const steps = Math.round((max - min) / step), ticks = opts.ticks !== false && steps > 0 && steps <= 12;
+  el.innerHTML = _fdHead("rs-slider") + '<div class="rs-slider-track"><div class="rs-slider-fill"></div></div>' + (ticks ? '<div class="rs-slider-ticks"></div>' : "");
   el.querySelector(".rs-slider-l").textContent = opts.label || "";
   const track = el.querySelector(".rs-slider-track"), fill = el.querySelector(".rs-slider-fill"), out = el.querySelector(".rs-slider-v");
   const ins = (two ? ["From", "To"] : [opts.label || "Value"]).map(name => {
@@ -23,11 +28,46 @@ export function rsSlider(el, opts = {}){
     track.appendChild(i); return i;
   });
   const val = () => two ? ins.map(i => +i.value) : +ins[0].value;
+  // the place of a value on the track, as the thumb's centre (the thumb moves inside the track: --rs-sl-th is its width, dashboard.css)
+  const at = v => "calc(var(--rs-sl-th) / 2 + (100% - var(--rs-sl-th)) * " + (v - min) / (max - min || 1) + ")";
+  const tickEls = ticks ? Array.from({length: steps + 1}, (_, k) => {
+    const v = +(min + k * step).toFixed(10), t = document.createElement("span");
+    t.className = "rs-slider-tick"; t.dataset.v = v; t.textContent = fmt(v); t.style.left = at(v);
+    el.querySelector(".rs-slider-ticks").appendChild(t); return t;
+  }) : [];
+  // a pointer press on the track or a label: the nearest handle goes to the step under the pointer and follows it; onChange at the release
+  const stepAt = x => {
+    const r = track.getBoundingClientRect(), th = parseFloat(getComputedStyle(el).getPropertyValue("--rs-sl-th")) || 18;
+    const f = Math.max(0, Math.min(1, (x - r.left - th / 2) / (r.width - th || 1)));
+    return +Math.min(max, min + Math.round(f * (max - min) / step) * step).toFixed(10);
+  };
+  let held = null;
+  const move = (v, k) => {
+    if(two) v = k ? Math.max(v, +ins[0].value) : Math.min(v, +ins[1].value);
+    if(+ins[k].value === v) return false;
+    ins[k].value = v; paint(); opts.onInput?.(val()); return true;
+  };
+  [track, el.querySelector(".rs-slider-ticks")].filter(Boolean).forEach(zone => zone.addEventListener("pointerdown", e => {
+    if(e.target instanceof HTMLInputElement || e.button > 0) return;          // the thumb: the input's own drag
+    e.preventDefault();
+    const tick = e.target.closest(".rs-slider-tick"), v = tick ? +tick.dataset.v : stepAt(e.clientX);
+    const [lo, hi] = two ? val() : [0, 0], k = !two ? 0 : v >= hi ? 1 : v <= lo ? 0 : v - lo <= hi - v ? 0 : 1;      // the nearest handle
+    held = {k, moved: move(v, k), from: val()};
+    ins[k].focus({preventScroll: true});
+    zone.setPointerCapture(e.pointerId);
+  }));
+  [track, el.querySelector(".rs-slider-ticks")].filter(Boolean).forEach(zone => {
+    zone.addEventListener("pointermove", e => { if(held && move(stepAt(e.clientX), held.k)) held.moved = true; });
+    const end = () => { if(held && held.moved) opts.onChange?.(val()); held = null; };
+    zone.addEventListener("pointerup", end); zone.addEventListener("pointercancel", end);
+  });
   function paint(){
     const pc = v => (v - min) / (max - min || 1) * 100, v = val();
     if(two){ fill.style.left = pc(v[0]) + "%"; fill.style.width = pc(v[1]) - pc(v[0]) + "%"; out.textContent = fmt(v[0]) + " – " + fmt(v[1]); }
     else{ fill.style.left = "0"; fill.style.width = pc(v) + "%"; out.textContent = fmt(v); }
     ins.forEach(i => i.setAttribute("aria-valuetext", fmt(+i.value)));
+    const now = two ? v : [v];
+    tickEls.forEach(t => t.classList.toggle("on", now.includes(+t.dataset.v)));
   }
   ins.forEach((i, k) => {
     i.addEventListener("input", () => {

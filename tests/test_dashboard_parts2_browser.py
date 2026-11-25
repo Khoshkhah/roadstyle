@@ -10,7 +10,7 @@ from test_dashboard_sections_browser import _ARGS, _edges  # noqa: E402
 
 import roadstyle as rs  # noqa: E402
 
-_HTML = """<div id="range"></div><div id="week"></div><div id="month"></div><div id="hour"></div><div id="hours"></div><div id="sl"></div><div id="sl2"></div>
+_HTML = """<div id="range"></div><div id="week"></div><div id="month"></div><div id="hour"></div><div id="hours"></div><div id="sl"></div><div id="sl2"></div><div id="sl3"></div>
 <div id="num"></div><div id="col"></div><label class="rs-switch"><input type="checkbox" role="switch" id="sw"><span>Show bridges</span></label>
 <div id="q"></div><div id="drop"></div><div id="prog"></div><button type="button" id="busy">Load</button><button type="button" id="dots">Open</button>
 <nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Fixes<span class="rs-badge">12</span></button><button class="rs-tab" data-tab="b">Tags<span class="rs-unsaved" role="img" aria-label="Not saved"></span></button></nav>
@@ -34,6 +34,7 @@ _SETUP = """() => { window.got = {}; const $ = id => document.getElementById(id)
     hours: rs.hours.use($('hours'), {value: [7, 9], range: true, onChange: log('hours')}),
     sl: rs.slider($('sl'), {label: 'Speed', min: 0, max: 130, step: 10, value: 50, unit: 'km/h', onChange: log('sl')}),
     sl2: rs.slider($('sl2'), {label: 'Flow', min: 0, max: 100, value: [20, 60], onChange: log('sl2')}),
+    sl3: rs.slider($('sl3'), {label: 'Height', min: 0, max: 8, value: 3, format: i => [1.5, 4, 7, 10, 13, 16, 19, 22, 25][i] + ' m', onChange: log('sl3')}),
     num: rs.number($('num'), {label: 'Lanes', min: 1, max: 3, value: 2, onChange: log('num')}),
     col: rs.colorPick($('col'), {label: 'Fill', value: '#0e7f91', palette: ['#0e7f91', '#eb6834', '#2a78d6'], onChange: log('col')}),
     q: rs.search($('q'), {placeholder: 'Find a place', button: 'Go', suggest: t => ['Monaco', 'Monte Carlo', 'Tartu'].filter(n => n.toLowerCase().startsWith(t.toLowerCase())).map(n => ({label: n, sub: 'x', value: n})),
@@ -345,6 +346,38 @@ def test_a_field_error_rows_with_a_select_box_and_a_select_box_in_a_frame(page):
     assert edge == "1px"                                                 # a select box in a frame has the edge of a field
 
 
+_TICK = "v => { const r = document.querySelector('#sl3 .rs-slider-tick[data-v=\"' + v + '\"]').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }"
+_TRACK_AT = "([id, f]) => { const r = document.querySelector(id + ' .rs-slider-track').getBoundingClientRect(); return [r.left + 9 + (r.width - 18) * f, r.top + r.height / 2]; }"
+
+
+def test_a_slider_moves_by_a_click_on_its_track_or_a_label_and_by_its_keys(page):
+    """A press on the track moves the nearest handle to the step there; onChange comes once. A slider of 12 steps or fewer has a mark and a label at
+    each step, and a press on a label selects it. Arrow keys, Home and End move it. A slider of more steps has no marks."""
+    assert page.locator("#sl3 .rs-slider-tick").all_inner_texts() == ["1.5 m", "4 m", "7 m", "10 m", "13 m", "16 m", "19 m", "22 m", "25 m"]
+    assert page.inner_text("#sl3 .rs-slider-tick.on") == "10 m" and page.locator("#sl .rs-slider-tick").count() == 0
+    x, y = page.evaluate(_TRACK_AT, ["#sl3", 6 / 8])
+    page.mouse.click(x, y)
+    assert page.evaluate("P.sl3.value()") == 6 and _got(page, "sl3") == [6] and page.inner_text("#sl3 .rs-slider-v") == "19 m"
+    page.mouse.click(*page.evaluate(_TICK, 8))                            # the label "25 m"
+    assert page.evaluate("P.sl3.value()") == 8 and _got(page, "sl3") == [6, 8]
+    page.mouse.click(*page.evaluate(_TICK, 8))                            # the same step: no change, no onChange
+    assert _got(page, "sl3") == [6, 8]
+    for key, want in (("Home", 0), ("ArrowRight", 1), ("End", 8), ("ArrowLeft", 7)):
+        page.keyboard.press(key)                                         # the focus is on the slider after a click
+        assert page.evaluate("P.sl3.value()") == want, key
+    assert _got(page, "sl3")[-4:] == [0, 1, 8, 7]
+    a, b = page.evaluate(_TRACK_AT, ["#sl3", 2 / 8]), page.evaluate(_TRACK_AT, ["#sl3", 5 / 8])
+    page.mouse.move(*a)                                                  # press and drag on the track: one onChange
+    page.mouse.down()
+    page.mouse.move(b[0], b[1], steps=5)
+    page.mouse.up()
+    assert page.evaluate("P.sl3.value()") == 5 and _got(page, "sl3")[-2:] == [7, 5]
+    page.mouse.click(*page.evaluate(_TRACK_AT, ["#sl", 0.2]))            # a slider with no marks: the track too
+    assert page.evaluate("P.sl.value()") == 30
+    page.mouse.click(*page.evaluate(_TRACK_AT, ["#sl2", 0.9]))           # two handles: the nearest one
+    assert page.evaluate("P.sl2.value()") == [20, 90]
+
+
 def test_the_parts_fit_a_phone(page_path):
     """390 px: no part is wider than the panel, and each control that a finger hits is 40 px high or more."""
     with pw.sync_playwright() as p:
@@ -363,6 +396,12 @@ def test_the_parts_fit_a_phone(page_path):
           const small = [...document.querySelectorAll('#range .rs-day-field, #hour .rs-hours-field, #hours .rs-hours-field, #hour .rs-day-step, #num .rs-num-box, #col .rs-color-btn, #q .rs-search-box, #tools button, .rs-more-btn')]
             .filter(e => e.getBoundingClientRect().height < 40).map(e => e.className + ' ' + Math.round(e.getBoundingClientRect().height));
           return {wide, small, page: document.documentElement.scrollWidth - innerWidth}; }""")
+        labels = pg.evaluate("[...document.querySelectorAll('#sl3 .rs-slider-tick')].map(t => { const r = t.getBoundingClientRect(); return [r.left, r.right]; })")
+        assert all(a[1] <= b[0] for a, b in zip(labels, labels[1:], strict=False)), labels                     # the labels of the steps do not cover each other
+        pg.locator("#sl3").scroll_into_view_if_needed()
+        x, y = pg.evaluate(_TICK, 1)
+        pg.touchscreen.tap(x, y)                                         # a finger on the label "4 m"
+        assert pg.evaluate("P.sl3.value()") == 1 and pg.evaluate("got.sl3") == [1]
         pg.evaluate("rs.toast('On a phone.')")
         top = pg.evaluate("document.querySelector('#rs-toasts').getBoundingClientRect().top")
         browser.close()
