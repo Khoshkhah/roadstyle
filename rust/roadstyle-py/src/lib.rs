@@ -480,11 +480,13 @@ fn make_area(py: Python<'_>, edges: &Bound<'_, PyAny>, folder: String, id_col: S
     }).map_err(|e: roadstyle::Error| py_err(e))
 }
 
-/// base_map_theme(theme) -> str: a base map's theme (roadstyle-look's basemap::load_theme) as JSON text: [osm_carto.yaml in the theme's
-/// colours, the theme file itself, [saturation, lighten] of its transform]. An unknown theme is a ValueError that names the themes.
+/// base_map_theme(theme, own=[]) -> str: a base map's theme (roadstyle-look's basemap::load_theme) as JSON text: [osm_carto.yaml in the
+/// theme's colours, the theme file itself, [saturation, lighten] of its transform]. `own`: the user's own themes, (name, text). An unknown
+/// theme is a ValueError that names the themes.
 #[pyfunction]
-fn base_map_theme(theme: &str) -> PyResult<String> {
-    let (style, file, (s, l)) = roadstyle::look::basemap::load_theme(theme).map_err(|e| PyValueError::new_err(e.to_string()))?;
+#[pyo3(signature = (theme, own=Vec::new()))]
+fn base_map_theme(theme: &str, own: Vec<(String, String)>) -> PyResult<String> {
+    let (style, file, (s, l)) = roadstyle::look::basemap::load_theme(theme, &own).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok(serde_json::json!([style, file, [s, l]]).to_string())
 }
 

@@ -84,6 +84,35 @@ pub fn themes() -> Vec<&'static str> {
     std::iter::once("osm").chain(THEMES.iter().map(|t| t.0)).collect()
 }
 
+/// The user's own themes (./themes, ~/.config/roadstyle/themes: `Options::files["themes"]`): (name, text).
+pub type OwnThemes = [(String, String)];
+
+/// A theme file by name: the user's own first (as _style_dirs), else the bundled one. An own file with `extends: <theme>` gives only
+/// what it changes: it is merged over that theme's file (an own theme or a bundled one; `extends` with its own name is the bundled
+/// one). "osm" is the empty file. `depth` stops a loop of `extends`.
+fn theme_file(theme: &str, own: &OwnThemes, bundled_only: bool, depth: usize) -> Result<Value, Error> {
+    let mine = own.iter().find(|t| !bundled_only && t.0 == theme);
+    let Some((_, text)) = mine else {
+        if theme == "osm" {
+            return Ok(json!({}));
+        }
+        let text = THEMES.iter().find(|t| t.0 == theme).map(|t| t.1).ok_or_else(|| {
+            let mut names: Vec<&str> = themes();
+            names.extend(own.iter().map(|t| t.0.as_str()).filter(|n| !themes().contains(n)));
+            Error::Unknown(format!("unknown theme '{theme}'; choose from {}", pyrepr(&names)))
+        })?;
+        return Ok(style(text));
+    };
+    let mut t = yaml(text).map_err(|e| Error::File(format!("theme {theme}: {e}")))?;
+    let Some(parent) = t.as_object_mut().and_then(|m| m.remove("extends")) else { return Ok(t) };
+    let parent = parent.as_str().ok_or_else(|| Error::Options(format!("theme {theme}: extends must be the name of a theme")))?.to_string();
+    if depth > 8 {
+        return Err(Error::Options(format!("theme {theme}: extends goes round in a loop")));
+    }
+    let base = theme_file(&parent, own, parent == theme, depth + 1)?;
+    Ok(merge(Some(&base), &t))
+}
+
 fn pyrepr(names: &[&str]) -> String {
     format!("({})", names.iter().map(|n| format!("'{n}'")).collect::<Vec<_>>().join(", "))
 }
@@ -173,14 +202,12 @@ fn merge(a: Option<&Value>, b: &Value) -> Value {
 
 /// A theme: osm_carto.yaml in its colours (its transform on every colour, then its own colours), the theme file itself (empty for
 /// "osm") and its transform (saturation, lighten), for the colours that come from elsewhere.
-pub fn load_theme(theme: &str) -> Result<(Value, Value, (f64, f64)), Error> {
+pub fn load_theme(theme: &str, own: &OwnThemes) -> Result<(Value, Value, (f64, f64)), Error> {
     let base = style(CARTO);
-    if theme == "osm" {
+    if theme == "osm" && own.iter().all(|t| t.0 != "osm") {
         return Ok((base, json!({}), (1.0, 0.0)));
     }
-    let text = THEMES.iter().find(|t| t.0 == theme).map(|t| t.1)
-        .ok_or_else(|| Error::Unknown(format!("unknown theme '{theme}'; choose from {}", pyrepr(&themes()))))?;
-    let t = style(text);
+    let t = theme_file(theme, own, false, 0)?;
     let tr = &t["transform"];
     let tr = (tr["saturation"].as_f64().unwrap_or(1.0), tr["lighten"].as_f64().unwrap_or(0.0));
     let colored = walk(&base, &|v| recolor(v, tr.0, tr.1));
@@ -334,7 +361,8 @@ fn base_map_args(b: &BaseMap, th: &Value, spec: &Value) -> Map<String, Value> {
     args
 }
 
-pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
+/// The base map's look of the choice `b`, with the user's own themes `own`.
+pub fn base_map(b: &BaseMap, own: &OwnThemes) -> Result<BaseMapLook, Error> {
     if !LOOKS.contains(&b.mode.as_str()) {
         return Err(Error::Unknown(format!("unknown mode '{}'; choose from {}", b.mode, pyrepr(&LOOKS))));
     }
@@ -345,7 +373,7 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
     })?;
     let modes = style(MODES);
     let spec = modes.get(&b.mode).filter(|s| !s.is_null()).cloned().unwrap_or_else(|| json!({}));
-    let (mut themed, th, tr) = load_theme(&b.theme)?;
+    let (mut themed, th, tr) = load_theme(&b.theme, own)?;
     if let Some(z) = b.buildings_min_zoom.filter(|z| (0.0..=22.0).contains(z)) {
         themed["features"]["areas"]["buildings"]["min_zoom"] = json!(z);
     }
@@ -389,11 +417,32 @@ mod tests {
     /// The buildings' first zoom: the theme's by default (liberty: 14), the option's when it is given, and the other areas stay as they are.
     #[test]
     fn buildings_min_zoom() {
-        let zoom = |b: &BaseMap| base_map(b).unwrap().features["style"]["areas"].clone();
+        let zoom = |b: &BaseMap| base_map(b, &[]).unwrap().features["style"]["areas"].clone();
         let (plain, given) = (zoom(&BaseMap::default()), zoom(&BaseMap { buildings_min_zoom: Some(12.0), ..BaseMap::default() }));
         assert_eq!(plain["buildings"]["min_zoom"], json!(14));
         assert_eq!(given["buildings"]["min_zoom"], json!(12.0));
         assert_eq!(plain["parking"], given["parking"]);
+    }
+
+    /// An own theme (./themes/<name>.yaml) with `extends`: the bundled theme with only the changed keys; an own theme with a bundled
+    /// theme's name is used first, and `extends` with its own name is the bundled one; an unknown theme names the own ones too.
+    #[test]
+    fn own_themes_extend_a_theme() {
+        let own = [("noise".to_string(), "extends: grey\nfeatures:\n  areas:\n    buildings: {fill: \"#d6d3ce\", outline: \"#bdb8b0\"}\n".to_string()),
+                   ("grey".to_string(), "extends: grey\nbackground: \"#ffffff\"\n".to_string())];
+        let (themed, th, _) = load_theme("noise", &own).unwrap();
+        let (b, grey) = (&themed["features"]["areas"]["buildings"], load_theme("grey", &[]).unwrap().0["features"]["areas"]["buildings"].clone());
+        assert_eq!((&b["fill"], &b["outline"]), (&json!("#d6d3ce"), &json!("#bdb8b0")));
+        assert_eq!(b["min_zoom"], grey["min_zoom"]);                       // a key that the file does not state: grey's
+        assert_eq!(th["background"], json!("#ffffff"));                       // noise extends the own grey, which extends the bundled one
+        assert_eq!(themed["features"]["areas"]["water"], load_theme("grey", &[]).unwrap().0["features"]["areas"]["water"]);
+        assert!(th.get("extends").is_none());
+        let e = load_theme("nois", &own).unwrap_err().to_string();
+        assert!(e.contains("'noise'"), "{e}");
+        let looped = [("a".to_string(), "extends: b\n".to_string()), ("b".to_string(), "extends: a\n".to_string())];
+        assert!(load_theme("a", &looped).unwrap_err().to_string().contains("loop"));
+        let page = base_map(&BaseMap { theme: "noise".into(), ..BaseMap::default() }, &own).unwrap();
+        assert_eq!(page.features["style"]["areas"]["buildings"]["fill"], json!("#d6d3ce"));
     }
 
     #[test]

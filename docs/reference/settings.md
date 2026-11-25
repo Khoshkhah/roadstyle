@@ -50,6 +50,32 @@ rs.use_settings({"palette": "night"})                   # the rest of the proces
 
 An unknown name is an error that lists the names there are. A palette is a file: Python has no palette registry.
 
+## Base-map themes
+
+A theme gives the colours of the base map of a duckOSM page: the land, the water, the buildings, the land cover and the roads.
+`rs.duckosm.page(db, theme="grey")` picks one. The bundled themes are `google`, `grey`, `liberty` (default), `roadstyle` and `osm`, in
+`roadstyle/data/basemap/themes/`. Read them for every key and its comment.
+
+**Your own:** a file `./themes/<name>.yaml` in the working directory (or under `~/.config/roadstyle/themes/`). Pick it by its name.
+With `extends: <theme>`, the file states only what it changes, and it merges over that theme:
+
+```yaml
+# ./themes/noise.yaml                    use it with theme="noise"
+extends: grey
+features:
+  areas:
+    buildings: {fill: "#d6d3ce", outline: "#bdb8b0"}
+```
+
+```python
+rs.duckosm.page("norrmalm.duckdb", theme="noise")
+```
+
+- A file without `extends` is a full theme over the OpenStreetMap colours, as a bundled theme is.
+- An own file with the name of a bundled theme is used in its place. In that file, `extends` with the same name is the bundled theme.
+- An unknown name is an error that lists the names there are.
+- `palette=` cannot go with a duckOSM page: the theme gives the colours of its roads. Put road colours in the theme (`roads: colors:`).
+
 ## The settings file
 
 Every settings level uses one layout. `profile` and `palette` name the look; `config` holds what is not a look:

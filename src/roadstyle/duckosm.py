@@ -131,9 +131,11 @@ def look(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
 
 
 def _options(db, mode, theme, paths, levels, kwargs) -> dict:
-    """The look's options of a duckOSM map (`look`): the base map's, and the map options."""
+    """The look's options of a duckOSM map (`look`): the base map's, the map options and the user's own files (an own theme)."""
+    from ._engine import _own_files
+
     args = {**kwargs, **({"levels": levels} if levels is not None else {})}
-    return {"base_map": {"mode": mode, "theme": theme, "paths": paths, "place": Path(db).stem}, "args": args}
+    return {"base_map": {"mode": mode, "theme": theme, "paths": paths, "place": Path(db).stem}, "args": args, "files": _own_files()}
 
 
 def export_inline(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google", layers: bool = True, levels: str = "stored",
@@ -244,18 +246,19 @@ def base_map(mode: str = "all", *, theme: str = "liberty", paths: str = "google"
     """The base map's look of one choice (roadstyle-look's basemap.rs; mapstyle's mode_settings and styles): {"palette": the roads'
     palette name, "settings": its settings source, "features": the base map's part of the look (its layers, 3D heights, style and
     images), "map": the look's map options with the mode's, "page": the mode's page defaults}."""
-    from ._engine import rust
+    from ._engine import _own_files, rust
 
-    lk = rust().resolve_look(json.dumps({"base_map": {"mode": mode, "theme": theme, "paths": paths}}))
+    lk = rust().resolve_look(json.dumps({"base_map": {"mode": mode, "theme": theme, "paths": paths}, "files": _own_files()}))
     return {**{k: json.loads(lk.part(k)) for k in ("palette", "settings", "features", "map")}, "page": json.loads(lk.part("base_map_page"))}
 
 
 def theme(name: str = "osm"):
     """``(style, file, transform)`` of a base map's theme: osm_carto.yaml in the theme's colours, the theme file ({} for "osm") and its
-    transform (saturation, lighten), for ``recolor``."""
-    from ._engine import rust
+    transform (saturation, lighten), for ``recolor``. An own theme (./themes/<name>.yaml) is found as ``page`` finds it."""
+    from ._engine import _own_files, rust
 
-    style, file, transform = json.loads(rust().base_map_theme(name))
+    own = list(_own_files().get("themes", {}).items())
+    style, file, transform = json.loads(rust().base_map_theme(name, own))
     return style, file, tuple(transform)
 
 

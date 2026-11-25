@@ -451,7 +451,9 @@ pub fn make_look(options: &Value) -> Result<Value, Error> {
 /// The look of version 1 of `options`, and the base map's keywords (its map options and its page defaults; none with no base map).
 pub(crate) fn resolve(options: &Options) -> Result<(LookData, Map<String, Value>), Error> {
     let own = options.own();
-    let bm = options.base_map.as_ref().map(crate::basemap::base_map).transpose()?;
+    let themes: Vec<(String, String)> = options.files.get("themes").and_then(Value::as_object).into_iter().flatten()
+        .filter_map(|(n, t)| Some((n.clone(), t.as_str()?.to_string()))).collect();
+    let bm = options.base_map.as_ref().map(|b| crate::basemap::base_map(b, &themes)).transpose()?;
     if bm.is_some() && (options.palette.is_some() || options.features.is_some()) {
         return Err(Error::Options("look options: base_map gives the palette and the base map's part (features): give none of them with it".into()));
     }
