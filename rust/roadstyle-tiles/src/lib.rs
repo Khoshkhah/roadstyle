@@ -312,6 +312,15 @@ impl Tiles {
     /// `archive` with the tiles not compressed one by one (`plain`): the whole archive gzips better as one stream (the tiles are small, about
     /// 1 KB at the last zoom, and a stream of 32 KB sees what the tiles have in common: Nacka, MLT, 7.7 MB in 6.2 MB).
     pub fn archive_in(&self, bounds: [f64; 4], layers: &[String], plain: bool) -> Result<Vec<u8>, Error> {
+        self.archive_with(bounds, layers, plain, None)
+    }
+
+    /// `archive_in` with the tile layers `layers` alone: a page's own archive of an overlay (docs/design/tiling.md, "One source for each overlay").
+    pub fn archive_of(&self, bounds: [f64; 4], layers: &[String], plain: bool) -> Result<Vec<u8>, Error> {
+        self.archive_with(bounds, layers, plain, Some(layers))
+    }
+
+    fn archive_with(&self, bounds: [f64; 4], layers: &[String], plain: bool, only: Option<&[String]>) -> Result<Vec<u8>, Error> {
         let mut w = if plain { pmtiles::Writer::plain() } else { pmtiles::Writer::default() };
         let ll = |lon, lat| merc_ll(lon, lat).ok_or_else(|| Error::Options(format!("the archive's bounds {bounds:?} are not longitude and latitude")));
         let (lo, hi) = (ll(bounds[0], bounds[1])?, ll(bounds[2], bounds[3])?);
@@ -324,7 +333,7 @@ impl Tiles {
             let (x0, x1, y0, y1) = (cell(lo[0] - b), cell(hi[0] + b), cell(hi[1] - b), cell(lo[1] + b));
             for x in x0..=x1 {
                 for y in y0..=y1 {
-                    let t = self.build_in(self.format, z, x, y)?;       // each tile once: the cache is for a map that asks again (review 4, D9)
+                    let t = self.build_in_of(self.format, z, x, y, only)?;       // each tile once: the cache is for a map that asks again (review 4, D9)
                     if !t.is_empty() {
                         w.write_tile(pmtiles::tile_id(z, x, y), &if plain { t } else { pmtiles::gzip(&t) });
                     }
@@ -359,7 +368,12 @@ impl Tiles {
 
     /// `build` in the format `format`: the tile of `build`, made again as MLT (mlt.rs).
     pub fn build_in(&self, format: TileFormat, z: u32, x: u32, y: u32) -> Result<Vec<u8>, Error> {
-        let mvt = self.build(z, x, y);
+        self.build_in_of(format, z, x, y, None)
+    }
+
+    /// `build_in` with the tile layers `only` alone (None: every layer).
+    fn build_in_of(&self, format: TileFormat, z: u32, x: u32, y: u32, only: Option<&[String]>) -> Result<Vec<u8>, Error> {
+        let mvt = self.build_of(z, x, y, only);
         match format {
             TileFormat::Mvt => Ok(mvt),
             TileFormat::Mlt => mlt::from_mvt(&mvt),
@@ -381,12 +395,16 @@ impl Tiles {
 
     /// The tile z/x/y, made again (`tile` with no cache): for a walk that asks for each tile once (the archive, a folder of tiles).
     pub fn build(&self, z: u32, x: u32, y: u32) -> Vec<u8> {
+        self.build_of(z, x, y, None)
+    }
+
+    fn build_of(&self, z: u32, x: u32, y: u32, only: Option<&[String]>) -> Vec<u8> {
         if z < self.min_zoom || z > self.max_zoom {
             return Vec::new();
         }
         let mut out = Vec::new();
         for (name, layer) in &self.layers {
-            if z >= layer.min_zoom {
+            if z >= layer.min_zoom && only.is_none_or(|o| o.contains(name)) {
                 out.extend(self.layer_tile(name, layer, z, x, y)); // a tile's layers are repeated fields: their bytes join
             }
         }

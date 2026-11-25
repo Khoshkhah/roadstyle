@@ -139,8 +139,8 @@ pub struct PageParts<'a> {
     /// gzip the big GeoJSON sources (_compress_sources); `gz`: the blobs made by the caller (the caller's zlib), else the crate gzips
     pub compress: bool,
     pub gz: Option<Map<String, Value>>,
-    /// a tiled page: the PMTiles archive
-    pub tiles: Option<&'a [u8]>,
+    /// a tiled page: its PMTiles archives by source (`roads` and each overlay's own); empty: not tiled
+    pub tiles: Vec<(&'a str, &'a [u8])>,
     /// the road table (tiles.sidecar's form), in both ways: the table, or its gzipped base64 made by the caller
     pub side: Option<(&'a Value, Option<&'a str>)>,
     /// the settings of simple mode's recolouring script, when the page is in simple mode
@@ -274,11 +274,13 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
                                     ("__RS_OPTIONS__", script_json(&Value::Object(opts))),
                                     ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
-    if p.tiles.is_some() || !page.ground.is_null() || !page.scene_3d.is_null() {
+    if !p.tiles.is_empty() || !page.ground.is_null() || !page.scene_3d.is_null() {
         parts = format!("<script>{}</script>", PMTILES_JS.replace("</script>", "<\\/script>"));       // the roads' archive and the ground's terrain file
     }
-    if let Some(pmt) = p.tiles {
-        parts.push_str(&TILES.replace("__RS_PMTILES_B64__", &base64::engine::general_purpose::STANDARD.encode(crate::tiles::pmtiles::gzip_at(pmt, 9))));
+    if !p.tiles.is_empty() {
+        let b64: Map<String, Value> = p.tiles.iter()
+            .map(|(k, a)| (k.to_string(), base64::engine::general_purpose::STANDARD.encode(crate::tiles::pmtiles::gzip_at(a, 9)).into())).collect();
+        parts.push_str(&TILES.replace("__RS_PMTILES__", &script_json(&Value::Object(b64))));
     }
     if let Some((side, side_b64)) = p.side {
         let side_b64 = side_b64.map_or_else(|| gzip_b64(&serde_json::to_vec(&JsSafe(side)).expect("a JSON value")), String::from);
@@ -305,7 +307,7 @@ pub fn page_of_json(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>
     let parts = PageParts {
         name: p["name"].as_str().unwrap_or(""), cam, bounds: [b(0), b(1), b(2), b(3)], side_panel_html: p["side_panel_html"].as_str(),
         host_panel_width: p["host_panel_width"].as_f64().unwrap_or(320.0), compress: p["compress"] == true, gz: p["gz"].as_object().cloned(),
-        tiles: pmtiles, side: (p["side_b64"].is_string() || !p["side"].is_null()).then(|| (&p["side"], p["side_b64"].as_str())),
+        tiles: pmtiles.map(|a| vec![(crate::tiles::SOURCE, a)]).unwrap_or_default(), side: (p["side_b64"].is_string() || !p["side"].is_null()).then(|| (&p["side"], p["side_b64"].as_str())),
         simple_js: (!p["simple_js"].is_null()).then_some(&p["simple_js"]), sources: None,
     };
     Ok(page_html(style, &page, &parts))

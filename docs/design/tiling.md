@@ -30,6 +30,41 @@ file server. A transport never changes a tile.
 | File server, PMTiles | `pmtiles://<URL>` | Gzip for each tile (the PMTiles format reads a range of one tile) | `export_style`, `roadstyle tiles` |
 | File server, XYZ | `https://.../{z}/{x}/{y}.mlt` | None in the file; the web server compresses | `export_style`, `roadstyle tiles` |
 
+## One source for each hidden overlay (2026-11-24)
+
+On the page (the embedded archive), each overlay that starts hidden (`visible=False`) and has tiles is a vector source of its own: the source `ovN`, with the tile layer `ovN`, at
+`pmtiles://ovN/{z}/{x}/{y}`, from its own archive (`Tiles::archive_of`, `own_sources` in `page_options.rs`). The roads, the base map, the
+boundary and the overlays that show at the start stay in the one source `roads`. The cut, the format, the zooms and the keys are the same: only the source changes.
+
+**Why.** MapLibre 5.24's MLT reader decodes every layer of a tile, with its geometry and all its columns, when the tile arrives (the MVT reader
+reads a layer only when a shown layer asks for it). A hidden overlay in `roads` was decoded at each pan and zoom. MapLibre asks for the tiles of a
+source only while one of its layers shows, so a hidden overlay with its own source costs nothing.
+
+**Measured** on noise-map's page (Norrmalm: 63 hidden overlays, 41k wall points at 9 heights and 1.03 M surface vertices in 54 views; Chromium,
+the time of MapLibre's tile worker in a trace for a tour of 24 views at zoom 13 to 16, the median of 3 runs; each page built from the same data):
+
+| Page | Page size | Tile worker |
+|---|---|---|
+| The 63 noise overlays in `roads` (before) | 54.3 MB | 4.79 s |
+| The 63 noise overlays in their own sources | 48.7 MB | 2.86 s |
+| No noise overlays (before / now) | 16.8 MB | 2.27 s / 2.29 s |
+
+After the tour, no hidden overlay's source has a tile (`roads` has 12). The 0.57 s that stays is not tile decoding: the page has 162 style layers
+against 45.
+
+**The source has `tiles`, not `url`.** With a `url`, MapLibre asks for the archive's header (its TileJSON) when the style loads, and the page
+then inflates every archive at the start. With `tiles`, the page inflates an overlay's archive the first time the overlay shows.
+
+**Why not every overlay.** In a source of its own, each tile of an overlay is one more task of the tile worker. The 6 overlays that show at the start on
+noise-map's page (the base map's) cost 1.6 s more in their own sources (4.30 s against 2.65 s, without the noise overlays). An overlay that starts hidden and then shows
+pays this only while it shows. A hidden overlay that started shown stays in `roads` and is decoded as before.
+
+**Edge cases.** An overlay whose style makes no tile at any zoom has no archive and stays in `roads`. A page whose roads, base map and boundary make no tile
+(a page of overlays alone) keeps the overlays in `roads`, so that `roads` has tiles.
+
+**Not done:** the map worker (`rs://`), `export_style` and `roadstyle tiles` keep every overlay in `roads`. The page of noise-map uses the
+embedded archive.
+
 ## Why these values (Nacka, 22,191 roads, measured 2026-10-29)
 
 The embedded archive, the tiles of one page:
@@ -168,6 +203,8 @@ the gain of moving them is mostly the tags of two keys (about 2 of 10 on a piece
 3. The keys of the embedded page include the class, the filter column, `__rs_twoway`, the edge, `lvl` and the width, because the page filters read them from the feature. The road
    table has all of them. Rule: the page reads them by the id. Not done.
 4. A host can ask the worker for z17 or more tiles; the look sets the last zoom, and the worker follows it.
+5. An overlay that starts hidden has its own source on the page only ([One source for each hidden overlay](#one-source-for-each-hidden-overlay)). The map worker, `export_style` and
+   `roadstyle tiles` keep the overlays in `roads`.
 
 ## Tests
 

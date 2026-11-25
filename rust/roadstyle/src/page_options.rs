@@ -310,7 +310,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let (mut style, archive) = if tiled { tiled_page(&src, look, &a)? } else {
         src.page_arrows();          // stage 3 of the inline page: the arrows are points that the page puts itself (audit N2)
         // the style without its sources' data, which the page writer writes from `src` (audit D3, N29)
-        (src.style_with(crate::sources::SourceMode::inline_of(&a), false), None)
+        (src.style_with(crate::sources::SourceMode::inline_of(&a), false), Vec::new())
     };
     let mut table = Vec::new();
     crate::write_road_table(&src, None, true, &mut table).map_err(|e| crate::error::file(crate::ROAD_TABLE, e))?;
@@ -368,7 +368,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let side = gzip_b64(&table);
     let parts = PageParts {
         name: &k.name, cam: page_camera(look, &k)?, bounds, side_panel_html: k.side_panel_html.as_deref(),
-        host_panel_width: k.host_panel_width, compress: k.compress, gz: None, tiles: archive.as_deref(),
+        host_panel_width: k.host_panel_width, compress: k.compress, gz: None, tiles: archive.iter().map(|(k, a)| (k.as_str(), a.as_slice())).collect(),
         side: Some((&Value::Null, Some(&side))), simple_js: Some(&simple_js), sources: Some(&src),
     };
     let mut html = page_html(page_style, &opts, &parts);
@@ -694,7 +694,10 @@ const WHOLE_SOURCES: [&str; 2] = ["decks", "shadows"];
 /// has one vector source `roads` (the embedded archive) with a tile layer for each source (the roads, the base map, the boundary and the
 /// overlays), as the map worker and the server tiles have; only `WHOLE_SOURCES` stay inline. An overlay's tiles have only the keys that the
 /// style reads: all its rows (its properties and its box, `crate::rows_file`) go into the style as a gzip data URL (`roadstyle:interaction.base_props`), which the page reads by row.
-fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
+/// The PMTiles archives of a tiled page by source: `roads` first, then each hidden overlay's own.
+type Archives = Vec<(String, Vec<u8>)>;
+
+fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value, Archives), crate::Error> {
     let c = &look.map.columns;
     let hw = Some(c.class.as_str()).filter(|h| !h.is_empty()).unwrap_or("highway");
     fn col(v: &Option<String>) -> Option<&str> {
@@ -709,8 +712,33 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
     }
     let (mut style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}), crate::sources::SourceMode::inline_of(a))?;
     thin_arrows(&mut style, look);
-    // the page gzips the whole archive (page.rs), so its tiles are not gzipped one by one
-    let archive = t.archive_in(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names(), true)?;
+    // the page gzips each archive as one stream (page.rs), so its tiles are not gzipped one by one
+    let bounds = t.bounds().ok_or(crate::tiles::Error::Empty)?;
+    let names = t.layer_names();
+    // an overlay whose layers make no tile at any zoom (its style hides it at every tile zoom) has no archive: it stays in `roads`
+    let mut archives = Vec::new();
+    for k in overlay_sources(&style).into_iter().filter(|k| names.contains(k)) {
+        match t.archive_of(bounds, std::slice::from_ref(&k), true) {
+            Ok(a) => archives.push((k, a)),
+            Err(crate::tiles::Error::Empty) => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    let own: Vec<String> = archives.iter().map(|(k, _)| k.clone()).collect();
+    let rest: Vec<String> = names.iter().filter(|n| !own.contains(n)).cloned().collect();
+    let roads = match t.archive_of(bounds, &rest, true) {
+        Ok(a) => {
+            own_sources(&mut style, &own);
+            a
+        }
+        // no road, base map or boundary has a tile (a page of overlays alone): the overlays stay in `roads`, which then has tiles
+        Err(crate::tiles::Error::Empty) if !own.is_empty() => {
+            archives.clear();
+            t.archive_in(bounds, &names, true)?
+        }
+        Err(e) => return Err(e.into()),
+    };
+    archives.insert(0, (crate::tiles::SOURCE.to_string(), roads));
     // the rows of each overlay (all its properties and its box): the tiles have only the keys that the style reads
     let urls: Map<String, Value> = s.shown().filter(|(k, _)| o.wants(k) && !["simple", "slots"].contains(k)).filter_map(|(k, src)| {
         use base64::Engine;
@@ -720,7 +748,43 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
     if !urls.is_empty() {
         style["metadata"]["roadstyle:interaction"]["base_props"] = Value::Object(urls);
     }
-    Ok((style, Some(archive)))
+    Ok((style, archives))
+}
+
+/// One source for each hidden overlay (docs/design/tiling.md): the layers of each overlay in `own` move from the source `roads` to a vector source
+/// of the overlay's own name, whose tiles are its own archive (`pmtiles://<source>/{z}/{x}/{y}`). MapLibre asks for a source's tiles only while one of
+/// its layers shows, and MapLibre's MLT reader decodes every layer of a tile: a hidden overlay in `roads` cost every map move its decoding
+/// (noise-map, 63 hidden overlays: 67 % more worker time, 2026-11-24). The source has `tiles`, not `url`: a `url` asks for the archive's header
+/// when the style loads, which inflates every archive. `own`: the overlay sources that have an archive.
+fn own_sources(style: &mut Value, own: &[String]) {
+    let roads = style["sources"][crate::tiles::SOURCE].clone();
+    for k in own {
+        let mut v = json!({"type": "vector", "tiles": [format!("pmtiles://{k}/{{z}}/{{x}}/{{y}}")]});
+        for key in ["minzoom", "maxzoom", "encoding"] {
+            if !roads[key].is_null() {
+                v[key] = roads[key].clone();
+            }
+        }
+        style["sources"][k] = v;
+    }
+    for l in style["layers"].as_array_mut().into_iter().flatten() {
+        if let Some(k) = l["source-layer"].as_str().filter(|k| own.iter().any(|o| o == k)).map(String::from) {
+            l["source"] = k.into();
+        }
+    }
+}
+
+/// The sources of the page's overlays (`roadstyle:controls.overlays`) that start hidden: every layer on the source has the visibility `none`. An overlay
+/// that shows at the start stays in `roads`: in a source of its own, each tile is one more worker task, and the 6 shown overlays of noise-map's page
+/// (the base map's) cost the tile worker 1.6 s more on the tour of `docs/design/tiling.md` (4.30 s against 2.65 s).
+fn overlay_sources(style: &Value) -> Vec<String> {
+    let layers = style["layers"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let hidden = |k: &str| {
+        let mut on = layers.iter().filter(|l| l["source-layer"] == k || l["source"] == k).peekable();
+        on.peek().is_some() && on.all(|l| l["layout"]["visibility"] == "none")
+    };
+    style["metadata"]["roadstyle:controls"]["overlays"].as_array().into_iter().flatten().filter_map(|o| o["source"].as_str()).filter(|k| hidden(k))
+        .map(String::from).collect()
 }
 
 /// The arrows of a tiled page repeat along the slots (the page has no road to put one arrow on), one for each piece. They are thinned as the
@@ -754,6 +818,22 @@ fn k_cam<'a>(k: &'a PageKeys, name: &str) -> Option<&'a Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn each_hidden_overlay_with_tiles_has_its_own_source() {
+        let mut style = json!({"metadata": {"roadstyle:controls": {"overlays": [{"source": "ov0"}, {"source": "ov1"}]}},
+            "sources": {"roads": {"type": "vector", "url": "pmtiles://roads", "minzoom": 6, "maxzoom": 16, "encoding": "mlt"}},
+            "layers": [{"id": "r", "source": "roads", "source-layer": "simple"}, {"id": "a", "source": "roads", "source-layer": "ov0", "layout": {"visibility": "none"}},
+                       {"id": "b", "source": "roads", "source-layer": "ov1", "layout": {"visibility": "none"}},
+                       {"id": "c", "source": "roads", "source-layer": "ov2", "layout": {"visibility": "visible"}}]});
+        style["metadata"]["roadstyle:controls"]["overlays"].as_array_mut().unwrap().push(json!({"source": "ov2"}));
+        assert_eq!(overlay_sources(&style), ["ov0", "ov1"]);           // ov2 shows at the start: it stays in `roads`
+        // ov1 has no archive (no tile at any zoom): it stays in `roads`
+        own_sources(&mut style, &["ov0".into()]);
+        assert_eq!(style["sources"]["ov0"], json!({"type": "vector", "tiles": ["pmtiles://ov0/{z}/{x}/{y}"], "minzoom": 6, "maxzoom": 16, "encoding": "mlt"}));
+        let src: Vec<&str> = style["layers"].as_array().unwrap().iter().map(|l| l["source"].as_str().unwrap()).collect();
+        assert_eq!(src, ["roads", "ov0", "roads", "roads"]);
+    }
 
     #[test]
     fn a_key_goes_into_a_tile_url_as_basemaps_puts_it() {

@@ -414,7 +414,7 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `popup` | `None` = all fields | fields on click; `[]` = not clickable |
 | `popup_window` | `True` | `False`: clickable and selected (`rs:select` fires) but no popup (and no read-out in panel mode) |
 | `tooltip` | `None` | fields on hover |
-| `visible` | `True` | shown on open |
+| `visible` | `True` | shown on open. On a page with tiles, an overlay with `visible=False` has its own tile source: MapLibre asks for its tiles only while it shows, so a hidden overlay costs a pan or a zoom nothing ([Tiling](../design/tiling.md#one-source-for-each-hidden-overlay)) |
 | `edge_col` | `None` | the property with the id of the feature's edge: the overlay is attached to edges, drawn at its edge's fill number (the guide: [Overlays](../guides/overlays.md#overlays-attached-to-edges)) |
 | `order_col` | `None` | with `edge_col`: the property with the feature's order (whole number, lower first; null = 0) |
 | `select` | `"road"` | with `edge_col`: a hover or click picks the feature's road (`"road"`) or the feature itself (`"item"`: its own highlight and popup, `rs:select` with `item` and the road); anything else is an error |

@@ -16,6 +16,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 - **`roadstyle.duckosm.page` takes the keywords of `render_dashboard`.** A page with its own data can now use the full map of a duckOSM file: `overlays=[rs.Overlay(...)]`, `dashboard={"panel": {...}, "toolbar": {...}}`, `live_data=True`, `page_script=`, `boundary=`, `color_options=`, `minzoom=`, `include=` / `exclude=` and `palette=` / `profile=` / `settings=`. Before, an overlay gave "Object of type Overlay is not JSON serializable", and `dashboard` was `True` or `False` only. The page converts the keywords as `render_edges` does. Test: `tests/test_duckosm.py`.
 
+### Changed
+
+- **An overlay that starts hidden has its own tile source on a page with tiles.** Before, every overlay was a layer of the one `roads` source, and MapLibre's MLT reader decodes every layer of a tile: a hidden overlay was decoded at each pan and zoom. noise-map's page (63 hidden overlays) did 67 % more work in the tile worker than the page with no overlays. Now an overlay `ovN` with `visible=False` is the source `ovN` with its own archive in the page, inflated the first time the overlay shows; MapLibre asks for its tiles only while one of its layers shows. An overlay that shows at the start stays in `roads` (in its own source each tile is one more worker task). Click, hover, `rs:select`, `rsSetOverlay` and the JS API do not change; a host that reads the feature state of a hidden overlay names its source `ovN` (was `roads`). Docs: [Tiling](docs/design/tiling.md#one-source-for-each-hidden-overlay). Tests: `tests/test_overlay_tiles_browser.py`, `page_options.rs` (`each_hidden_overlay_with_tiles_has_its_own_source`).
+
 ### Fixed
 
 - **`roadstyle.duckosm.page(..., vehicles=...)` (the page of duckOSM's `net.map`) plays the run.** It took the option as it was, so the page had no vehicles module: "rs.vehicles.load: wasm is missing". Now both page writers make the option ready as `render_edges` does: the local files, roadstyle's vehicles module and the play bar.
