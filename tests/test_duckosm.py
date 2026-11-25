@@ -177,6 +177,23 @@ def _opt(html, key):
     return json.JSONDecoder().raw_decode(html, at)[0][key]
 
 
+def test_an_own_theme_extends_a_bundled_theme(tmp_path, monkeypatch):
+    """theme="noise" reads ./themes/noise.yaml, as a palette is read; with `extends: grey` it states only what it changes."""
+    from roadstyle import duckosm
+
+    db = _tiny(tmp_path / "p.duckdb")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "themes").mkdir()
+    (tmp_path / "themes" / "noise.yaml").write_text('extends: grey\nfeatures:\n  areas:\n    buildings: {fill: "#d6d3ce", outline: "#bdb8b0"}\n')
+    _, file, _ = duckosm.theme("noise")
+    grey = duckosm.theme("grey")[1]
+    assert file["features"]["areas"]["buildings"]["fill"] == "#d6d3ce" and file["background"] == grey["background"]
+    assert duckosm.base_map(theme="noise")["features"]["style"]["areas"]["buildings"]["outline"] == "#bdb8b0"
+    assert "rsDashboard" in duckosm.page(db, "driving", levels="tags", theme="noise").html
+    with pytest.raises(ValueError, match="'noise'"):
+        duckosm.theme("nois")
+
+
 def test_the_modes_column_names_the_modes_of_each_road():
     import pyarrow as pa
 

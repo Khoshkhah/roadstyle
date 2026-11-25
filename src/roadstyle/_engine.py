@@ -210,11 +210,11 @@ def _settings_data(settings):
 
 
 def _own_files() -> dict:
-    """The user's own profiles and palettes (_settings._style_dirs: ./profiles, ./palettes, then the user config; the first file of a name
-    wins) as text, for the engine's look."""
+    """The user's own profiles, palettes and base-map themes (_settings._style_dirs: ./profiles, ./palettes, ./themes, then the user
+    config; the first file of a name wins) as text, for the engine's look."""
     from . import _settings as _s
     out = {}
-    for kind in ("profiles", "palettes"):
+    for kind in ("profiles", "palettes", "themes"):
         found = {}
         for d in _s._style_dirs(kind):
             for f in sorted(d.glob("*.yaml")) if d.is_dir() else ():
