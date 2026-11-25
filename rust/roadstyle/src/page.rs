@@ -97,6 +97,9 @@ pub struct PageOptions {
     /// the label of the base-map box's one switch of the base map's layers (the page's default: "Map layers")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overlays_label: Option<String>,
+    /// a tiled page: the boundary's GeoJSON (its outline is a tile layer; boundary.js reads the shape here). Null: the boundary's source has it
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub boundary_shape: Value,
     pub overlay_popup: bool,
     pub tunnel: Value,
     pub fill_layers: Value,
