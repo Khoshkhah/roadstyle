@@ -132,7 +132,7 @@ impl Page {
         for (path, bytes) in &self.files {
             let p = dir.join(path);
             p.parent().map(std::fs::create_dir_all).transpose().and_then(|_| std::fs::write(&p, bytes))
-                .map_err(|e| crate::error::file(&p.display().to_string(), e))?;
+                .map_err(|e| crate::error::file(p.display(), e))?;
         }
         Ok(())
     }
