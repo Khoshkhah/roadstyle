@@ -346,6 +346,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     dashboard.google_3d.selected = k.google_3d_selected;
     dashboard.boundary.dim = k.boundary_dim;
     dashboard.boundary.limit = k.boundary_limit;
+    dashboard.boundary.bounds = look.map.boundary.as_ref().and_then(crate::dashboard::boundary_bounds);
     // street_view="dock": Street View beside the map with a divider (the map and the window share the screen). The page has no panel and the bar is at the
     // left, the map's own edge; `dashboard=` can still give a panel and move the bar
     if k.street_view == "dock" {
@@ -582,6 +583,7 @@ pub fn host_options(look: &Look, given: &Map<String, Value>) -> Result<(Value, V
     dashboard.google_3d.selected = k.google_3d_selected;
     dashboard.boundary.dim = k.boundary_dim;
     dashboard.boundary.limit = k.boundary_limit;
+    dashboard.boundary.bounds = look.map.boundary.as_ref().and_then(crate::dashboard::boundary_bounds);
     if let Some(over) = k.dashboard.as_ref().filter(|v| !v.is_null()) {
         dashboard = crate::dashboard::merge(&dashboard, over)?;
     }

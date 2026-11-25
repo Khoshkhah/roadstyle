@@ -230,7 +230,7 @@ Returns a `WebMap` (`.save()`).
 | `page_script` | `None` | web | JavaScript text that the page runs, the last script of the body, before the page is ready: it sees `rs`. Put the code in `rs.ready(() => ...)`, which runs it when the panel's sections are there (and at once if they are) ([Live data](../guides/dashboard-manual/javascript.md#live-data-a-new-day)) |
 | `vehicles` | `None` | web | a traffic microsimulation run that the page loads at start: `{"fcd": ..., "net": ..., "routes": ..., "wasm": ...}`: SUMO's FCD output as Parquet (`--fcd-output.geo true`), the run's `net.xml`, (optional) a file with its `<vType>` elements, and (optional) the URL of `roadstyle_wasm.js` built with the feature `vehicles`. Each file is a local path (a `Path`, or a text that names a file: it goes into the page) or a URL from the page. With no `wasm`, the page gets roadstyle's vehicles module and a play bar (play, pause, seek, speed). The vehicles are 3D boxes in their lanes (`rs.vehicles`, [the design](../design/vehicles_spec.md)); their colours, sizes and numbers are the look's `vehicles` section |
 | `page_style` | `None` | web | CSS text of the page, the last style of the body |
-| `boundary_limit` | `False` | web | `True`: the camera stays near `boundary` (the center inside its bounds grown by `limit_pad`, and the lowest zoom `zoom_out` levels under the fit) |
+| `boundary_limit` | `False` | web | `True`: the camera stays near `boundary`. The map shows nothing outside the boundary's box grown by `limit_pad` (`map.setMaxBounds`), and the lowest zoom is `zoom_out` levels under the zoom at which the box fits the window. It works on a GeoJSON page, a tiled page and `duckosm.page` |
 
 ## Pages
 
@@ -356,8 +356,8 @@ There is no `hide` key and no `phone` option. The page turns to its phone form b
 | `dim` | `False` | shades the outside of the boundary (the keyword `boundary_dim`) |
 | `limit` | `False` | keeps the camera near the boundary (the keyword `boundary_limit`) |
 | `dim_light`, `dim_dark` | `0.16`, `0.4` | the opacity of the shade in the light and in the dark theme |
-| `limit_pad` | `2.0` | the center of the map stays inside the bounds of the boundary, grown by this share of their size |
-| `zoom_out` | `3.0` | the lowest zoom is this many levels under the zoom at which the whole boundary fits the window |
+| `limit_pad` | `2.0` | the map shows nothing outside the box of the boundary, grown on each side by this share of its size (`0.5`: half the width and half the height) |
+| `zoom_out` | `3.0` | the lowest zoom is this many levels under the zoom at which the whole boundary fits the window. The page calculates it again when the window changes size |
 
 A page with no `boundary=` has neither the shade nor the limit.
 
