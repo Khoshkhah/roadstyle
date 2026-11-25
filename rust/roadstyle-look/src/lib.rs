@@ -189,6 +189,10 @@ impl Look {
     /// keyword goes to `other`. A keyword that is read with another one (`items` with `items_popup`, `color_table` with `color_key`)
     /// takes the other one from this call only: give both to the resolution.
     pub fn with_arg(self, key: &str, value: Value) -> Result<Look, Error> {
+        if key == "overlays" {          // the data of the overlays is moved, not copied (MapOptions::with_overlays)
+            let map = self.map.with_overlays(value)?;
+            return self.with_map(map);
+        }
         let mut one = Map::new();
         one.insert(key.into(), value.clone());
         let (map, rest) = self.map.with_args(&Value::Object(one))?;
