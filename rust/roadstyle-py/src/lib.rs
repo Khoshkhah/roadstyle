@@ -429,7 +429,7 @@ type PageFiles = Vec<(String, Py<pyo3::types::PyBytes>)>;
 #[pyfunction]
 #[pyo3(signature = (roads, look, options, given, features=None))]
 fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, options: String, given: String, features: Option<&Bound<'_, PyAny>>)
-             -> PyResult<(String, PageFiles)> {
+             -> PyResult<(String, PageFiles, Vec<String>)> {
     let options: roadstyle::look::Options = serde_json::from_str(&options).map_err(|e| PyValueError::new_err(format!("options: {e}")))?;
     let given: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&given).map_err(|e| PyValueError::new_err(format!("given: {e}")))?;
     let (look, roads, features) = (&look.0, stream(roads)?, features.map(stream).transpose()?);
@@ -442,7 +442,18 @@ fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, 
         .map_err(py_err)?;
     warned(&page.warnings);
     let files = page.files.iter().map(|(p, b)| (p.clone(), pyo3::types::PyBytes::new(py, b).unbind())).collect();
-    Ok((page.html, files))
+    Ok((page.html, files, page.overlay_sources))
+}
+
+/// overlay_files(look, source, tile_format=None) -> (archive, rows): the files of one hidden overlay of a page with lazy_overlays=True
+/// (roadstyle::page_options::overlay_files): its PMTiles archive and its gzipped rows, with its tile layer named `source`. `look`: the page's look
+/// with this overlay as its one overlay.
+#[pyfunction]
+#[pyo3(signature = (look, source, tile_format=None))]
+fn overlay_files(py: Python<'_>, look: PyRef<'_, PyLook>, source: String, tile_format: Option<String>) -> PyResult<(Py<pyo3::types::PyBytes>, Py<pyo3::types::PyBytes>)> {
+    let look = &look.0;
+    let (a, r) = py.detach(|| roadstyle::page_options::overlay_files(look, &source, tile_format.as_deref())).map_err(py_err)?;
+    Ok((pyo3::types::PyBytes::new(py, &a).unbind(), pyo3::types::PyBytes::new(py, &r).unbind()))
 }
 
 /// page_key_defaults() -> str: the defaults of the keywords that only the page reads (JSON text), which page_from takes for a keyword that
@@ -675,6 +686,7 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(given_of, m)?)?;
     m.add_function(wrap_pyfunction!(page_of_json, m)?)?;
     m.add_function(wrap_pyfunction!(page_from, m)?)?;
+    m.add_function(wrap_pyfunction!(overlay_files, m)?)?;
     m.add_function(wrap_pyfunction!(page_key_defaults, m)?)?;
     m.add_function(wrap_pyfunction!(template_keys, m)?)?;
     m.add_function(wrap_pyfunction!(export_look, m)?)?;

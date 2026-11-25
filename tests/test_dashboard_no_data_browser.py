@@ -24,7 +24,7 @@ def _empty_page(path):
     lk, o = _engine._look_and_options({**kw, "palette": None, "profile": None, "settings": None, "highway_col": "highway", "state": "live"})
     empty = gpd.GeoDataFrame({"highway": []}, geometry=[], crs=4326)
     given = _engine.page_given(kw, None, None, None, lk, o["args"])
-    WebMap(*_engine.rust().page_from(_engine._arrow(empty), lk, json.dumps(o), json.dumps(given))).save(path)
+    WebMap(*_engine.rust().page_from(_engine._arrow(empty), lk, json.dumps(o), json.dumps(given))[:2]).save(path)
 
 
 def test_a_page_with_no_roads_has_no_banner_and_opens_on_the_world(tmp_path):
