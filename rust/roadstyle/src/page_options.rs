@@ -77,7 +77,8 @@ struct PageKeys {
     google_3d_layers: Vec<crate::dashboard::Layer3d>,
     google_3d_selected: bool,
     boundary_dim: bool,
-    boundary_limit: bool,
+    /// false, true (the box of `boundary`), the area itself: a [west, south, east, north] box or GeoJSON
+    boundary_limit: Value,
     dashboard: Option<Value>,
     page_script: Option<String>,
     vehicles: Value,
@@ -303,6 +304,29 @@ fn profile_on_ground(profile: &Value, ground: &Value, warnings: &mut Vec<String>
     }
 }
 
+/// boundary_limit: whether the camera is limited, and the box of the area: true takes the box of `boundary`; a [west, south, east, north]
+/// box or GeoJSON is the area itself (a page whose roads are tiled has its boundary only in the tiles, so the area is an input of the page).
+fn limit_area(v: &Value, look: &Look) -> Result<(bool, Option<[f64; 4]>), crate::Error> {
+    let bad = |m: &str| Err(crate::error::options(format!("boundary_limit: {m}")));
+    let bx = match v {
+        Value::Null | Value::Bool(false) => return Ok((false, None)),
+        Value::Bool(true) => match look.map.boundary.as_ref().and_then(crate::dashboard::boundary_bounds) {
+            Some(b) => b,
+            None => return bad("True takes the area of boundary=, and the page has none; give the area (a box or GeoJSON) to boundary_limit"),
+        },
+        Value::Array(a) => match a.iter().map(Value::as_f64).collect::<Option<Vec<f64>>>().as_deref() {
+            Some(&[w, s, e, n]) if w < e && s < n => [w, s, e, n],
+            _ => return bad("a box is [west, south, east, north], with west < east and south < north"),
+        },
+        Value::Object(_) => match crate::dashboard::boundary_bounds(v) {
+            Some(b) => b,
+            None => return bad("the GeoJSON has no coordinates"),
+        },
+        _ => return bad("give true, a [west, south, east, north] box or GeoJSON"),
+    };
+    Ok((true, Some(bx)))
+}
+
 pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
                  -> Result<Page, crate::Error> {
     let (template, layout) = form_of(given)?;
@@ -345,8 +369,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     dashboard.google_3d.layers = k.google_3d_layers.clone();
     dashboard.google_3d.selected = k.google_3d_selected;
     dashboard.boundary.dim = k.boundary_dim;
-    dashboard.boundary.limit = k.boundary_limit;
-    dashboard.boundary.bounds = look.map.boundary.as_ref().and_then(crate::dashboard::boundary_bounds);
+    (dashboard.boundary.limit, dashboard.boundary.bounds) = limit_area(&k.boundary_limit, look)?;
     // street_view="dock": Street View beside the map with a divider (the map and the window share the screen). The page has no panel and the bar is at the
     // left, the map's own edge; `dashboard=` can still give a panel and move the bar
     if k.street_view == "dock" {
@@ -582,8 +605,7 @@ pub fn host_options(look: &Look, given: &Map<String, Value>) -> Result<(Value, V
     dashboard.google_3d.layers = k.google_3d_layers.clone();
     dashboard.google_3d.selected = k.google_3d_selected;
     dashboard.boundary.dim = k.boundary_dim;
-    dashboard.boundary.limit = k.boundary_limit;
-    dashboard.boundary.bounds = look.map.boundary.as_ref().and_then(crate::dashboard::boundary_bounds);
+    (dashboard.boundary.limit, dashboard.boundary.bounds) = limit_area(&k.boundary_limit, look)?;
     if let Some(over) = k.dashboard.as_ref().filter(|v| !v.is_null()) {
         dashboard = crate::dashboard::merge(&dashboard, over)?;
     }

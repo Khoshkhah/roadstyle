@@ -1,6 +1,7 @@
-"""boundary_limit in a browser, on a GeoJSON page, a tiled page and duckosm.page: the map shows nothing outside the boundary's box grown by
-limit_pad (map.setMaxBounds), and the lowest zoom is zoom_out levels under the zoom that fits the box, again after a resize. A tiled page has
-the boundary only in its tiles: the page writer gives its box (dashboard.boundary.bounds). Skipped without playwright or the Rust extension."""
+"""boundary_limit in a browser, on a GeoJSON page, a tiled page and duckosm.page: the map shows nothing outside the area's box grown by
+limit_pad (map.setMaxBounds), and the lowest zoom is zoom_out levels under the zoom that fits the box, again after a resize. The area is an
+input: True takes boundary=, else boundary_limit is the area (a box, a shapely geometry, a GeoDataFrame, GeoJSON); the page writer gives
+its box (dashboard.boundary.bounds). Skipped without playwright or the Rust extension."""
 import pytest
 
 pw = pytest.importorskip("playwright.sync_api")
@@ -21,11 +22,17 @@ def _page(kind, tmp_path):
         from test_duckosm import _tiny
 
         from roadstyle import duckosm
-        duckosm.page(_tiny(tmp_path / "t.duckdb"), "driving", levels="tags", tiles=True, boundary=bd, boundary_limit=True, dashboard=RULES).save(str(path))
-    else:
-        edges = gpd.GeoDataFrame({"highway": ["residential"] * 4},
-                                 geometry=[LineString([(W + i * 2e-3, S), (W + i * 2e-3, N)]) for i in range(4)], crs=4326)
-        rs.render_edges(edges, basemap="blank", tiles=kind == "tiles", boundary=bd, boundary_limit=True, dashboard=RULES).save(path)
+        duckosm.page(_tiny(tmp_path / "t.duckdb"), "driving", levels="tags", tiles=True, boundary_limit=bd, dashboard=RULES).save(str(path))
+        return path
+    edges = gpd.GeoDataFrame({"highway": ["residential"] * 4},
+                             geometry=[LineString([(W + i * 2e-3, S), (W + i * 2e-3, N)]) for i in range(4)], crs=4326)
+    if kind == "geojson":                                                  # True: the box of boundary=
+        rs.render_edges(edges, basemap="blank", boundary=bd, boundary_limit=True, dashboard=RULES).save(path)
+    elif kind == "tiles":                                                  # a box, and no boundary=
+        rs.render_edges(edges, basemap="blank", tiles=True, boundary_limit=(W, S, E, N), dashboard=RULES).save(path)
+    else:                                                                  # a GeoDataFrame in metres
+        area = gpd.GeoDataFrame(geometry=[bd], crs=4326).to_crs(3857)
+        rs.render_edges(edges, basemap="blank", tiles=True, boundary_limit=area, dashboard=RULES).save(path)
     return path
 
 
@@ -34,7 +41,19 @@ _STATE = """() => { const b = map.getMaxBounds(), c = map.getCenter(), v = map.g
           view: [v.getWest(), v.getSouth(), v.getEast(), v.getNorth()], fit: map.cameraForBounds([[%r, %r], [%r, %r]], {padding: 0}).zoom}; }""" % (W, S, E, N)
 
 
-@pytest.mark.parametrize("kind", ["geojson", "tiles", "duckosm"])
+def test_true_with_no_boundary_says_so():
+    import geopandas as gpd
+    from shapely.geometry import LineString
+
+    import roadstyle as rs
+    edges = gpd.GeoDataFrame({"highway": ["residential"]}, geometry=[LineString([(W, S), (E, N)])], crs=4326)
+    with pytest.raises(Exception, match="boundary_limit"):
+        rs.render_edges(edges, basemap="blank", boundary_limit=True)
+    with pytest.raises(Exception, match="west < east"):
+        rs.render_edges(edges, basemap="blank", boundary_limit=(E, S, W, N))
+
+
+@pytest.mark.parametrize("kind", ["geojson", "tiles", "gdf", "duckosm"])
 def test_the_map_stops_at_the_boundary(kind, tmp_path):
     path = _page(kind, tmp_path)
     px, py = (E - W) * 0.5, (N - S) * 0.5

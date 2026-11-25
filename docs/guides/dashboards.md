@@ -63,7 +63,7 @@ Each item below has the same form: a picture or a live page when there is one, a
     - `rs.render_dashboard` takes road edges and gives one map object. `.save(path)` writes one HTML file that works offline, and `.html` is the same page as text.
     - `edges` is a GeoDataFrame in EPSG:4326 with a `LineString` for each road and a `highway` column.
     - `color_options` fills the *Colour by* list. `name` sets the page title.
-    - `boundary` is the outline of the area, and `boundary_limit=True` keeps the camera near it: the map cannot go far away.
+    - `boundary` is the outline of the area, and `boundary_limit=True` keeps the camera near it: the map cannot go far away. To limit the camera to another area, give that area to `boundary_limit`: a `(west, south, east, north)` box, a shapely geometry, a GeoDataFrame or GeoJSON.
     - Every call takes every `render_edges` keyword. `rs.render_street_view(edges)` gives Google Street View beside or below the map ([Street View](street-view.md)).
     - The command line is `roadstyle edges.gpkg --page dashboard -o dashboard.html`.
 
