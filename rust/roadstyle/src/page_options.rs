@@ -396,6 +396,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         select_color: ctl["select_color"].clone(), dock: ctl["dock"].clone(), vehicle_look: ctl["vehicle_look"].clone(), vehicles: k.vehicles.clone(), filter: ctl["filter"].clone(), filter_control: k.filter_control,
         color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend, hillshade: k.hillshade, terrain: k.terrain, terrain_exaggeration: k.terrain_exaggeration, terrain_tunnels: k.terrain_tunnels.clone(), buildings_opacity: k.buildings_opacity, ground: k.ground.clone(), scene_3d: crate::scene3d::option(&k.scene_3d, &k.ground)?,
         color_active: ctl["color_active"].clone(), overlays: overlays_with_rows(&ctl["overlays"], &inter["base_props"]), overlay_control: k.overlay_control, overlays_label: k.overlays_label.clone(), boundary_shape: meta["roadstyle:boundary_shape"].clone(),
+        overlay_layers: meta["roadstyle:overlay_layers"].clone(),
         overlay_popup: k.overlay_popup, tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
         views: Value::Array(views), items: ctl["items"].clone(), road_popup: inter["popup"].clone(), road_tooltip: inter["tooltip"].clone(),
         // the page's hover_delay_ms, else the look's (roadstyle:interaction)
@@ -795,24 +796,28 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>, lazy: bool, salt:
     }
     let own: Vec<String> = archives.iter().map(|(k, _)| k.clone()).collect();
     let rest: Vec<String> = names.iter().filter(|n| !own.contains(n)).cloned().collect();
-    let roads = match t.archive_of(bounds, &rest, true) {
+    // lazy: the page's own tiles (the roads, the base map, the boundary) are a file too, read by range requests (tiles gzipped one by one)
+    let roads = match t.archive_of(bounds, &rest, !lazy) {
         Ok(a) => {
             own_sources(&mut style, &own);
+            lazy_layers(&mut style, &own);
             a
         }
         // no road, base map or boundary has a tile (a page of overlays alone): the overlays stay in `roads`, which then has tiles
         Err(crate::tiles::Error::Empty) if !own.is_empty() => {
             archives.clear();
-            t.archive_in(bounds, &names, true)?
+            t.archive_in(bounds, &names, !lazy)?
         }
         Err(e) => return Err(e.into()),
     };
     let mut files: Vec<PageFile> = Vec::new();
     if lazy {
-        // the archives that are left here are the hidden overlays' own (own_sources): roads goes in below
+        // every archive is a file: the page's own (`roads`) and each hidden overlay's own (own_sources); the HTML has none
+        files.push(page_file(crate::tiles::SOURCE, FileKind::Tiles, roads, salt));
         files.extend(archives.drain(..).map(|(k, a)| page_file(&k, FileKind::Tiles, a, salt)));
+    } else {
+        archives.insert(0, (crate::tiles::SOURCE.to_string(), roads));
     }
-    archives.insert(0, (crate::tiles::SOURCE.to_string(), roads));
     // the rows of each overlay (all its properties and its box): the tiles have only the keys that the style reads
     let mut rows = Vec::new();
     let urls: Map<String, Value> = s.shown().filter(|(k, _)| o.wants(k) && !["simple", "slots"].contains(k)).filter_map(|(k, src)| {
@@ -904,6 +909,41 @@ fn own_sources(style: &mut Value, own: &[String]) {
             l["source"] = k.into();
         }
     }
+}
+
+/// The caller's hidden overlays (rs.Overlay, not the base map's) with a source of their own are not in the page's starting style: their source and
+/// layers go into `roadstyle:overlay_layers` (`{order, sources: {source: {source, layers}}}`, `order` the ids of every layer of the style), and the
+/// dashboard adds them when the overlay shows and takes them away when it hides (overlays.js). MapLibre walks every layer of the style at each frame:
+/// noise-map's page, 1,215 hidden overlays (2,449 layers, 9 shown), could not pan or zoom (2026-11-25).
+fn lazy_layers(style: &mut Value, own: &[String]) {
+    let users: Vec<String> = style["metadata"]["roadstyle:controls"]["overlays"].as_array().into_iter().flatten().filter(|o| o["base_map"] != true)
+        .filter_map(|o| o["source"].as_str()).filter(|s| own.iter().any(|o| o == s)).map(String::from).collect();
+    if users.is_empty() {
+        return;
+    }
+    let Some(layers) = style["layers"].as_array_mut() else { return };
+    let order: Vec<Value> = layers.iter().map(|l| l["id"].clone()).collect();
+    let mut out = Map::new();
+    let mut keep = Vec::with_capacity(layers.len());
+    for mut l in layers.drain(..) {
+        match l["source"].as_str().filter(|s| users.iter().any(|u| u == s)).map(String::from) {
+            Some(s) => {
+                if let Some(o) = l.as_object_mut() {
+                    o.shift_remove("metadata");      // as the page's own layers (page_style)
+                }
+                let e = out.entry(s).or_insert_with(|| json!({"layers": []}));
+                e["layers"].as_array_mut().expect("a list").push(l);
+            }
+            None => keep.push(l),
+        }
+    }
+    *layers = keep;
+    for s in &users {
+        if let Some(def) = style["sources"].as_object_mut().and_then(|m| m.shift_remove(s)) {
+            out.entry(s.clone()).or_insert_with(|| json!({"layers": []}))["source"] = def;
+        }
+    }
+    style["metadata"]["roadstyle:overlay_layers"] = json!({"order": order, "sources": out});
 }
 
 /// The sources of the page's overlays (`roadstyle:controls.overlays`) that start hidden: every layer on the source has the visibility `none`. An overlay
