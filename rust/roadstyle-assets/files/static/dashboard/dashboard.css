@@ -754,12 +754,15 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 #sb .rs-table th[data-sort=asc]::after{content:" \25B2";font-size:8px}
 #sb .rs-table th[data-sort=desc]::after{content:" \25BC";font-size:8px}
 
-/* ---- TABS AND THE TWO-WAY SWITCH (tabs.js): the selected one is in --accent-fill / --accent (the dashboard's one accent, above); the rest are the panel's muted ink ---- */
-#sb .rs-tabs{display:flex;flex-wrap:wrap;gap:2px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line)}
-#sb .rs-tab{padding:7px 9px;border:1px solid transparent;border-radius:8px;background:none;color:var(--mut);font:600 12px system-ui,sans-serif;cursor:pointer;user-select:none}
-#sb .rs-tab:hover{background:var(--rs-hover-bg);color:var(--accent);border-color:transparent}
-#sb .rs-tab.on,#sb .rs-tab.on:hover{color:#fff;background:var(--accent-fill);border-color:var(--accent-fill)}
-#sb .rs-tab.on:is(:hover,:focus-visible){filter:brightness(1.1)}
+/* ---- TABS AND THE TWO-WAY SWITCH (tabs.js). A tab is a text label on the row's line: the selected one is in --accent with a 3 px line under it
+   (no fill, so the tabs do not look like buttons or like the switch; the line is --accent-fill: the dark theme has no light line). The switch's selected segment is a raised card. The rest are the panel's muted ink ---- */
+#sb .rs-tabs{display:flex;flex-wrap:wrap;gap:0 4px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+#sb .rs-tab{margin-bottom:-1px;padding:8px 8px 7px;border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;background:none;color:var(--mut);
+  font:600 12.5px system-ui,sans-serif;white-space:nowrap;cursor:pointer;user-select:none}
+#sb .rs-tab.on{color:var(--accent);border-bottom-color:var(--accent-fill)}
+/* the pointer: a tint, and no accent (over `#sb button`'s hover, which has the accent border and text) */
+#sb .rs-tab:is(:hover,:focus-visible):not(:disabled){border-color:transparent;background:var(--rs-hover-bg);color:var(--ink)}
+#sb .rs-tab.on:is(:hover,:focus-visible):not(:disabled){border-bottom-color:var(--accent-fill);color:var(--accent)}
 #sb .rs-seg{display:flex;padding:2px;margin-bottom:12px;border-radius:10px;background:color-mix(in srgb,var(--mut) 25%,transparent)}
 #sb .rs-seg button{flex:1;padding:6px 8px;border:0;border-radius:8px;background:none;color:color-mix(in srgb,var(--ink) 70%,var(--mut));font:600 11.5px system-ui,sans-serif;cursor:pointer}
 #sb .rs-seg button:hover{background:var(--rs-hover-bg);color:var(--accent);border:0}
@@ -834,12 +837,11 @@ html[data-rs-theme=dark],#sb[data-theme=dark]{--rs-err:#fca5a5;--rs-warn:#fbbf24
 #sb :is(.rs-callout,.rs-chip,.rs-count).warn{--rs-st:var(--rs-warn)}
 #sb :is(.rs-callout,.rs-chip,.rs-count).ok{--rs-st:var(--rs-ok)}
 #sb :is(.rs-chip,.rs-count):is(.err,.warn,.ok){background:color-mix(in srgb,var(--rs-st) 16%,transparent);color:color-mix(in srgb,var(--rs-st) 80%,var(--ink))}
-/* a count after the words of a tab (`<span class="rs-count">3</span>`): a small pill. In the selected tab it is on the card colour, so it stays readable
-   on the filled tab. A page gives it err, warn or ok only when the count needs attention (a red 0 is noise). */
+/* a count after the words of a tab (`<span class="rs-count">3</span>`): a small pill, in the accent's tint in the selected tab. A page gives it err, warn
+   or ok only when the count needs attention (a red 0 is noise). */
 #sb .rs-count{display:inline-block;min-width:16px;margin-left:5px;padding:0 5px;border-radius:999px;background:color-mix(in srgb,var(--mut) 20%,transparent);
   color:var(--ink);font:600 10.5px/16px system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}
-#sb .rs-tab.on .rs-count{background:var(--card);color:var(--ink)}
-#sb .rs-tab.on .rs-count:is(.err,.warn,.ok){background:var(--card);color:color-mix(in srgb,var(--rs-st) 80%,var(--ink))}
+#sb .rs-tab.on .rs-count:not(.err,.warn,.ok){background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--rs-accent-text)}
 /* a link button (`<button class="rs-link">`): an action in a line of text or a title row ("clear", "default"), in the accent colour and with no box. Its
    rules start with #sb or .rs-frame to win over the panel's `#sb button` (a host page with a frame has no template). */
 :is(#sb,.rs-frame) button.rs-link{padding:0;border:0;border-radius:0;background:none;color:var(--accent);font:inherit;text-transform:none;letter-spacing:0;cursor:pointer}
@@ -945,6 +947,7 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 #sb .rs-frame-head{flex:none;margin:0 15px;padding-bottom:8px;border-bottom:1px solid var(--line)}
 #sb .rs-frame-head:empty{display:none}
 #sb .rs-frame-head .rs-tabs{padding:0;margin:0;border:0}
+#sb .rs-frame-head:has(> .rs-tabs){padding-bottom:0}          /* the selected tab's line is on the head's line */
 #sb .rs-panel-tabs{flex:none;padding:0 15px 10px;margin:0}   /* Ask as a tab (askPanel tab:): the row under the panel's title, outside the cards and the frame */
 .rs-frame-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
 /* the bar's line is inset as the head row's line (Kaveh: the full-width line above Examples, "make it better and shorter"); Ask has no line: its
@@ -1073,11 +1076,15 @@ html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}
 #rs-dock button{font:inherit;font-size:12px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 10px;cursor:pointer}
 #rs-dock button.sb-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600}
 #rs-dock :is(.rs-dock-arrow,.rs-dock-x){border:0;background:none;color:var(--mut);padding:4px 6px;display:inline-flex;align-items:center}
-#rs-dock .rs-tab{border:1px solid transparent;background:none;color:var(--mut);font-weight:600;padding:3px 10px;border-radius:7px}
-#rs-dock .rs-tab.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
-#rs-dock button:is(:hover,:focus-visible):not(:disabled):not(.sb-primary):not(.rs-tab.on){background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
-#rs-dock :is(.rs-dock-arrow,.rs-dock-x,.rs-tab):is(:hover,:focus-visible):not(.on){border-color:transparent}
-#rs-dock :is(button.sb-primary,.rs-tab.on):is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1)}
+/* the dock's tabs: the panel's tab look (a label, the selected one in --accent with its line on the head's line) */
+#rs-dock .rs-dock-tabs{align-self:stretch}
+#rs-dock .rs-tab{margin-bottom:-1px;padding:0 8px;border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;background:none;color:var(--mut);font-weight:600}
+#rs-dock .rs-tab.on{color:var(--accent);border-bottom-color:var(--accent-fill)}
+#rs-dock button:is(:hover,:focus-visible):not(:disabled):not(.sb-primary):not(.rs-tab){background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
+#rs-dock .rs-tab:is(:hover,:focus-visible){background:var(--rs-hover-bg)}
+#rs-dock .rs-tab:is(:hover,:focus-visible):not(.on){color:var(--ink)}
+#rs-dock :is(.rs-dock-arrow,.rs-dock-x):is(:hover,:focus-visible){border-color:transparent}
+#rs-dock button.sb-primary:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1)}
 #rs-dock :is(button,select,summary,a[href],th):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 #rs-dock input,#rs-dock select,#rs-dock textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px}
 /* the dock's table: as wide as its columns, the height of the dock, both scrollbars always visible, the header row and the first column in view */
@@ -1568,7 +1575,7 @@ html.rs-phone .rs-menu-item{padding:12px 13px}
 /* 13. a count on a tab or a button, and the amber "not saved" dot */
 .rs-badge{display:inline-block;min-width:18px;height:18px;box-sizing:border-box;margin-left:6px;padding:0 5px;border-radius:9px;background:color-mix(in srgb,var(--accent) 16%,transparent);
   color:color-mix(in srgb,var(--accent) 70%,var(--ink));font:700 11px/18px system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums;vertical-align:1px}
-:is(.on,.sb-primary,[aria-selected=true]) > .rs-badge{background:color-mix(in srgb,var(--accent-fill) 55%,#000);color:#fff}      /* on a fill: a darker teal with white text (8:1 or more), in both themes */
+:is(.on,.sb-primary,[aria-selected=true]):not(.rs-tab) > .rs-badge{background:color-mix(in srgb,var(--accent-fill) 55%,#000);color:#fff}      /* on a fill: a darker teal with white text (8:1 or more), in both themes */
 .rs-unsaved{display:inline-block;width:8px;height:8px;margin-left:6px;border-radius:50%;background:var(--rs-unsaved);vertical-align:1px}
 :is(.on,[aria-selected=true]) > .rs-unsaved{box-shadow:0 0 0 2px #fff}
 /* 14. steps: numbered cards; a done step has a check mark, the open step an accent edge, a step that waits is dimmed and says what it waits for */

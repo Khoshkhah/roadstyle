@@ -228,6 +228,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 
 ??? info "Details"
 
+    - A tab is a text label, not a button. The selected tab has the accent color and a line under it. A two-way switch has another look, so that a reader can see which one changes the pane.
     - `rs-count` is a count after the words of a tab. Add `err` or `warn` only when the count needs attention.
     - A click or the left and right keys select a tab. The selected button has `on` and `aria-selected="true"`.
     - The panes are the siblings of the `nav` with `data-pane`. Only the selected one shows.
@@ -1317,7 +1318,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 
 ??? info "Details"
 
-    - They go in a tab or a button. On a filled tab or button, the badge is a darker teal with white text.
+    - They go in a tab or a button. On a filled button, the badge is a darker teal with white text. In a selected tab, it is the accent's tint.
 
 ## Help and hints { .rs-group }
 

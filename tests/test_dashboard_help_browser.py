@@ -126,10 +126,12 @@ def test_tabs_select_by_click_and_arrow_and_the_switch_has_no_panes(tmp_path):
         assert page.locator("[data-v=y]").evaluate("e => e.classList.contains('on')") and not page.locator("[data-v=x]").evaluate("e => e.classList.contains('on')")
         assert page.locator("[data-pane=b]").is_visible()                              # the switch touches no pane
         assert page.evaluate("seen") == ["tb", "ta", "tb", "sy"]
-        def on():
-            return page.evaluate("getComputedStyle(document.querySelector('[data-tab=b]')).backgroundColor")
-        off = page.evaluate("getComputedStyle(document.querySelector('[data-tab=a]')).backgroundColor")
-        assert on() != off
+        page.mouse.move(1, 1)
+        # a tab is a label, not a button: the selected one has the accent text and a line under it, and no fill (the switch's look is another)
+        look = "s => { const c = getComputedStyle(document.querySelector(s)); return [c.color, c.borderBottomColor, c.borderBottomWidth, c.backgroundColor]; }"
+        on, off = page.evaluate(look, "[data-tab=b]"), page.evaluate(look, "[data-tab=a]")
+        assert on[0] != off[0] and on[1] != off[1] and on[2] == off[2] == "3px", (on, off)
+        assert on[3] == off[3] == "rgba(0, 0, 0, 0)", (on, off)
     _run(tmp_path, body)
 
 
