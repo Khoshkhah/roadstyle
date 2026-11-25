@@ -7,7 +7,11 @@
   var all=__RS_PMTILES__, proto=new pmtiles.Protocol(), roads=null;
   function archive(name){
     if(typeof all[name]!=="string"){
-      var fs=new pmtiles.FetchSource(all[name].url), f=new pmtiles.PMTiles({getKey:function(){return name;}, getBytes:fs.getBytes.bind(fs)});
+      var fs=new pmtiles.FetchSource(all[name].url);
+      // Chrome locks its HTTP cache for each URL, so range reads of one file wait for each other (one round trip for each tile). pmtiles
+      // turns the cache off for this only on Windows; Chrome on Linux and macOS has the same lock
+      fs.chromeWindowsNoCache=/Chrome|Chromium|Edg|OPR|Brave/.test(navigator.userAgent);
+      var f=new pmtiles.PMTiles({getKey:function(){return name;}, getBytes:fs.getBytes.bind(fs)});
       proto.add(f);
       return f;
     }

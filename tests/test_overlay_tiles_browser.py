@@ -100,6 +100,9 @@ def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when
             else:
                 route.fulfill(body=body, content_type="text/html" if name.endswith(".html") else "application/gzip")
         page.route("http://rs.test/**", serve)
+        # the cache of each range read: Chrome locks its HTTP cache for each URL, so with the cache on, the reads of one file go one after the other
+        page.add_init_script("""const f0 = fetch; window.__caches = [];
+            window.fetch = (u, o) => { if(String(u).endsWith('.pmtiles')) __caches.push(o && o.cache); return f0(u, o); };""")
         try:
             page.goto("http://rs.test/l.html")
             page.wait_for_function("window.map && window.map.loaded() && map.areTilesLoaded()", timeout=60_000)
@@ -111,6 +114,7 @@ def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when
             page.wait_for_function("rsQuery(() => true, 'hidden').length === 3", timeout=20_000)
             assert sorted({a.split(".", 1)[1] for a in asked if "/ov1-" in a}) == ["json.gz", "pmtiles"]
             assert ranges and all(r.endswith(".pmtiles") for r in ranges)                     # the archive: range requests only
+            assert set(page.evaluate("__caches")) == {"no-store"}, page.evaluate("__caches")  # on every OS, not only Windows
             page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
             x, y = page.evaluate("(() => { const q = map.project([18.0045, 59.302]); return [q.x, q.y]; })()")
             page.mouse.click(x, y)
