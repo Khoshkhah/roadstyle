@@ -69,3 +69,37 @@ def test_a_building_click_gives_its_fields_and_a_theme_colours_its_kind(tmp_path
     p = got["properties"]
     assert got["overlay"] == "buildings" and p["osm_id"] == "9007199254740993" and p["name"] == "Home A", got   # above 2**53: exact as text
     assert p["kind"] == "apartments", p
+
+
+def test_the_3d_buildings_have_the_kind_colours(tmp_path, monkeypatch):
+    """With the 3D buildings on, each kind has its theme colour (the flat fill's `match` on kind), not one colour for all."""
+    import io
+
+    from PIL import Image
+
+    from roadstyle import duckosm
+    (tmp_path / "themes").mkdir()
+    (tmp_path / "themes" / "kinds.yaml").write_text(_THEME)
+    monkeypatch.chdir(tmp_path)
+    path = tmp_path / "b3.html"
+    duckosm.page(_db(tmp_path / "b.duckdb"), "driving", levels="tags", tiles=True, theme="kinds", dashboard={"panel": None}).save(str(path))
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1000, "height": 700})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded() && window.rsReady", timeout=60_000)
+        page.evaluate("map.jumpTo({center: [7.4045, 43.7294], zoom: 17}); rsSetBuildings3D(true)")
+        page.wait_for_function("map.areTilesLoaded() && map.loaded()", timeout=20_000)
+        page.wait_for_timeout(500)
+        ex = page.evaluate("""() => { const ov = RS_OVERLAYS.find(o => o.label === 'buildings');
+          return {vis: map.getLayoutProperty(ov.extrude, 'visibility'), color: map.getPaintProperty(ov.extrude, 'fill-extrusion-color')}; }""")
+        pts = page.evaluate("""() => { const r = map.getContainer().getBoundingClientRect();
+          return [[7.4020, 43.7294], [7.4070, 43.7294]].map(c => { const q = map.project(c); return [r.left + q.x, r.top + q.y]; }); }""")
+        shot = Image.open(io.BytesIO(page.screenshot())).convert("RGB")
+        browser.close()
+    assert errors == []
+    assert ex["vis"] == "visible" and "#123456" in str(ex["color"]) and "#654321" in str(ex["color"]), ex
+    home, office = (shot.getpixel((round(x), round(y))) for x, y in pts)
+    assert sum(abs(a - b) for a, b in zip(home, office, strict=True)) > 60, (home, office)   # two kinds, two colours (with the 3D shade)

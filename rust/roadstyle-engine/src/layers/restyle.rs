@@ -153,7 +153,12 @@ impl Ov<'_> {
         // the flat colour may be a `coalesce` of a colour set by feature id around the `case`: the extrusion takes the `case` only
         let flat = layers[self.bodies[0]]["paint"].get("fill-color");
         let case = flat.and_then(Value::as_array).filter(|a| a.first() == Some(&json!("coalesce"))).and_then(|a| a.last()).or(flat);
-        let color = ms_swap(case, ex["color"].clone());
+        // a colour for each kind (a theme's `kinds`): the blocks have the colours of the flat fill
+        let base = match self.ll.get("color_by").filter(|v| crate::roads::yes(v)) {
+            Some(cb) => kind_match(&cb["map"], &ex["color"]),
+            None => ex["color"].clone(),
+        };
+        let color = ms_swap(case, base);
         self.new_layer(json!({"id": ov_3d(self.i), "type": "fill-extrusion", "metadata": {"roadstyle:group": "buildings 3D", "roadstyle:over": true},
                               "layout": {"visibility": "none"},
                               "paint": {"fill-extrusion-color": color, "fill-extrusion-height": ["get", "height"],
