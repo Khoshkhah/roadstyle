@@ -754,15 +754,25 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 #sb .rs-table th[data-sort=asc]::after{content:" \25B2";font-size:8px}
 #sb .rs-table th[data-sort=desc]::after{content:" \25BC";font-size:8px}
 
-/* ---- TABS AND THE TWO-WAY SWITCH (tabs.js). A tab is a text label on the row's line: the selected one is in --accent with a 3 px line under it
-   (no fill, so the tabs do not look like buttons or like the switch; the line is --accent-fill: the dark theme has no light line). The switch's selected segment is a raised card. The rest are the panel's muted ink ---- */
+/* ---- TABS AND THE TWO-WAY SWITCH (tabs.js). A tab is a text label on the row's thin line, not a button: the selected one is in --accent (weight 500)
+   with a 2.5 px line under it, the others in the muted ink, darker and tinted under the pointer. The line is --accent-fill: the dark theme has no light
+   line. The switch's selected segment is a raised card, so tabs and switches look different. The options of a row (tabs.js): data-icons ("top"),
+   data-fill, data-tint ---- */
 #sb .rs-tabs{display:flex;flex-wrap:wrap;gap:0 4px;margin-bottom:12px;border-bottom:1px solid var(--line)}
-#sb .rs-tab{margin-bottom:-1px;padding:8px 8px 7px;border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;background:none;color:var(--mut);
-  font:600 12.5px system-ui,sans-serif;white-space:nowrap;cursor:pointer;user-select:none}
-#sb .rs-tab.on{color:var(--accent);border-bottom-color:var(--accent-fill)}
-/* the pointer: a tint, and no accent (over `#sb button`'s hover, which has the accent border and text) */
+#sb .rs-tab{margin-bottom:-1px;padding:8px 8px 7px;border:0;border-bottom:2.5px solid transparent;border-radius:6px 6px 0 0;background:none;color:var(--mut);
+  font:400 12.5px system-ui,sans-serif;white-space:nowrap;cursor:pointer;user-select:none}
+#sb .rs-tab.on{color:var(--accent);font-weight:500;border-bottom-color:var(--accent-fill)}
+/* the pointer: the ink and a tint, and no accent (over `#sb button`'s hover, which has the accent border and text) */
 #sb .rs-tab:is(:hover,:focus-visible):not(:disabled){border-color:transparent;background:var(--rs-hover-bg);color:var(--ink)}
 #sb .rs-tab.on:is(:hover,:focus-visible):not(:disabled){border-bottom-color:var(--accent-fill);color:var(--accent)}
+#sb .rs-tabs[data-icons] .rs-tab{display:inline-flex;align-items:center;gap:6px}
+#sb .rs-tab-ic{flex:none;width:16px;height:16px}
+#sb .rs-tab-lb{display:inline-flex;align-items:center}          /* the label and its count (tabs.js puts them in it when the row has icons) */
+#sb .rs-tabs[data-icons=top] .rs-tab{flex-direction:column;gap:3px;padding:7px 8px 5px;font-size:11px}     /* the icon over the label */
+#sb .rs-tabs[data-icons=top] .rs-tab-ic{width:20px;height:20px}
+#sb .rs-tabs[data-fill]{gap:0}
+#sb .rs-tabs[data-fill] .rs-tab{flex:1 1 0;min-width:max-content;justify-content:center;text-align:center}
+#sb .rs-tabs[data-tint] .rs-tab.on{background:color-mix(in srgb,var(--accent) 10%,transparent)}
 #sb .rs-seg{display:flex;padding:2px;margin-bottom:12px;border-radius:10px;background:color-mix(in srgb,var(--mut) 25%,transparent)}
 #sb .rs-seg button{flex:1;padding:6px 8px;border:0;border-radius:8px;background:none;color:color-mix(in srgb,var(--ink) 70%,var(--mut));font:600 11.5px system-ui,sans-serif;cursor:pointer}
 #sb .rs-seg button:hover{background:var(--rs-hover-bg);color:var(--accent);border:0}
@@ -1078,8 +1088,8 @@ html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}
 #rs-dock :is(.rs-dock-arrow,.rs-dock-x){border:0;background:none;color:var(--mut);padding:4px 6px;display:inline-flex;align-items:center}
 /* the dock's tabs: the panel's tab look (a label, the selected one in --accent with its line on the head's line) */
 #rs-dock .rs-dock-tabs{align-self:stretch}
-#rs-dock .rs-tab{margin-bottom:-1px;padding:0 8px;border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;background:none;color:var(--mut);font-weight:600}
-#rs-dock .rs-tab.on{color:var(--accent);border-bottom-color:var(--accent-fill)}
+#rs-dock .rs-tab{margin-bottom:-1px;padding:0 8px;border:0;border-bottom:2.5px solid transparent;border-radius:6px 6px 0 0;background:none;color:var(--mut);font-weight:400}
+#rs-dock .rs-tab.on{color:var(--accent);font-weight:500;border-bottom-color:var(--accent-fill)}
 #rs-dock button:is(:hover,:focus-visible):not(:disabled):not(.sb-primary):not(.rs-tab){background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
 #rs-dock .rs-tab:is(:hover,:focus-visible){background:var(--rs-hover-bg)}
 #rs-dock .rs-tab:is(:hover,:focus-visible):not(.on){color:var(--ink)}

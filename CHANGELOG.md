@@ -18,7 +18,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 
-- **A tab looks like a tab** (`rs-tabs`, in the panel and in the dock). The selected tab was a filled teal box with white text, so the tabs looked like buttons and like the two-way switch `rs-seg`. Now a tab is a text label on the row's line: the selected one has the accent color and a 3 px line under it, and the pointer gives a tint. The switch keeps its look. Docs: `docs/guides/dashboard-parts.md`, `docs/design/dashboard_templates.md`.
+- **A tab looks like a tab** (`rs-tabs`, in the panel and in the dock). The selected tab was a filled teal box with white text, so the tabs looked like buttons and like the two-way switch `rs-seg`. Now a tab is a text label on the row's line: the selected one has the accent color (weight 500) and a 2.5 px line under it, and the pointer gives the ink and a tint. The switch keeps its look. Options of a tab row, off by default: `data-icons` (an icon before each label, from `data-icon` or the tab's own `<svg>`), `data-icons="top"` (the icon over the label), `data-fill` (the tabs share the row's width) and `data-tint` (a tint behind the selected tab); `rs.tabs.use(nav, onChange, {icons, fill, tint})` sets them. Test: `test_the_options_of_a_tab_row`. Docs: `docs/guides/dashboard-parts.md`, `docs/design/dashboard_templates.md`.
 
 ### Fixed
 

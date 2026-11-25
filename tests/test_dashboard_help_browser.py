@@ -130,8 +130,41 @@ def test_tabs_select_by_click_and_arrow_and_the_switch_has_no_panes(tmp_path):
         # a tab is a label, not a button: the selected one has the accent text and a line under it, and no fill (the switch's look is another)
         look = "s => { const c = getComputedStyle(document.querySelector(s)); return [c.color, c.borderBottomColor, c.borderBottomWidth, c.backgroundColor]; }"
         on, off = page.evaluate(look, "[data-tab=b]"), page.evaluate(look, "[data-tab=a]")
-        assert on[0] != off[0] and on[1] != off[1] and on[2] == off[2] == "3px", (on, off)
+        assert on[0] != off[0] and on[1] != off[1] and on[2] == off[2] and float(on[2][:-2]) >= 2, (on, off)       # 2.5 px: 2 px at a pixel ratio of 1
         assert on[3] == off[3] == "rgba(0, 0, 0, 0)", (on, off)
+    _run(tmp_path, body)
+
+
+def test_the_options_of_a_tab_row(tmp_path):
+    """The options of rs-tabs (tabs.js, docs/guides/dashboard-parts.md "Tabs"): icons from data-icon or the tab's own svg, the icon over the label
+    (top), tabs that share the row's width (fill), a tint behind the selected tab (tint); an unknown icon is an error that names the icons."""
+    def body(page):
+        page.evaluate("""() => { const d = document.createElement('div'); d.id = 'w'; d.style.width = '360px';
+            const row = (id, attrs) => '<nav class="rs-tabs" id="' + id + '"' + attrs + '><button class="rs-tab on" data-tab="a" data-icon="car">Traffic flow</button>'
+              + '<button class="rs-tab" data-tab="b" data-icon="gauge">Speed<span class="rs-count">3</span></button>'
+              + '<button class="rs-tab" data-tab="c"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>Own</button></nav>';
+            d.innerHTML = row('plain', '') + row('ic', ' data-icons') + row('top', ' data-icons="top" data-fill') + row('ft', ' data-fill data-tint');
+            document.querySelector('#sb .sb-body').appendChild(d);
+            for(const id of ['plain', 'ic', 'top', 'ft']) rs.tabs.use(document.getElementById(id), () => {}); }""")
+        box = "s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }"
+        assert page.evaluate("document.querySelectorAll('#plain .rs-tab-ic').length") == 0                  # off by default: no icon
+        assert page.evaluate("document.querySelectorAll('#ic .rs-tab-ic').length") == 3                     # two of the set and the tab's own svg
+        assert page.evaluate("document.querySelector('#ic [data-tab=b] .rs-tab-lb').textContent") == "Speed3"
+        ic, lb = page.evaluate(box, "#ic [data-tab=a] .rs-tab-ic"), page.evaluate(box, "#ic [data-tab=a] .rs-tab-lb")
+        assert ic[0] + ic[2] <= lb[0] and abs((ic[1] + ic[3] / 2) - (lb[1] + lb[3] / 2)) < 2                 # inline: before the label, on its line
+        ic, lb = page.evaluate(box, "#top [data-tab=b] .rs-tab-ic"), page.evaluate(box, "#top [data-tab=b] .rs-tab-lb")
+        assert ic[1] + ic[3] <= lb[1]                                                                        # top: over the label and its count
+        widths = [page.evaluate(box, f"#top [data-tab={t}]")[2] for t in "abc"]
+        assert max(widths) - min(widths) < 1 and abs(sum(widths) - page.evaluate(box, "#top")[2]) < 1          # fill: equal widths, the whole row
+        tint = "s => getComputedStyle(document.querySelector(s)).backgroundColor"
+        assert page.evaluate(tint, "#ft [data-tab=a]") != "rgba(0, 0, 0, 0)" and page.evaluate(tint, "#plain [data-tab=a]") == "rgba(0, 0, 0, 0)"
+        err = page.evaluate("""() => { const n = document.createElement('nav'); n.className = 'rs-tabs'; n.dataset.icons = '';
+            n.innerHTML = '<button class="rs-tab" data-tab="a" data-icon="boat">A</button>';
+            try { rs.tabs.use(n); return null; } catch(e) { return e.message; } }""")
+        assert "no icon 'boat'" in err and "gauge" in err
+        assert page.evaluate("""() => { const n = document.createElement('nav'); n.className = 'rs-tabs';
+            n.innerHTML = '<button class="rs-tab" data-tab="a" data-icon="map">A</button>';
+            rs.tabs.use(n, null, {icons: 'top', fill: true}); return [n.dataset.icons, n.hasAttribute('data-fill'), n.querySelectorAll('.rs-tab-ic').length]; }""") == ["top", True, 1]
     _run(tmp_path, body)
 
 

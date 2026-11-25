@@ -149,6 +149,24 @@ const PARTS = [
       '<p class="gl-out" id="tabs-out">onChange: none yet</p>'});
     rs.tabs.use(document.querySelector('[data-rs-section="tabs"] .rs-tabs'), id => out("tabs-out", `onChange: <b>${id}</b>`));
   }},
+  {id: "tabs-icons", name: "Tabs with icons", make(){
+    rs.sections.add({id: "tabs-icons", html: '<nav class="rs-tabs" data-icons><button class="rs-tab on" data-tab="flow" data-icon="car">Traffic flow</button><button class="rs-tab" data-tab="speed" data-icon="gauge">Speed</button><button class="rs-tab" data-tab="noise" data-icon="volume">Noise<span class="rs-count">3</span></button></nav>' +
+      '<div data-pane="flow"><p>The pane of the tab Traffic flow.</p></div><div data-pane="speed" hidden><p>The pane of the tab Speed.</p></div><div data-pane="noise" hidden><p>The pane of the tab Noise.</p></div>' +
+      '<p class="gl-out">&lt;nav class="rs-tabs" data-icons&gt;</p>'});
+    rs.tabs.use(document.querySelector('[data-rs-section="tabs-icons"] .rs-tabs'), () => {});
+  }},
+  {id: "tabs-fill", name: "Tabs that fill the row, with a tint", make(){
+    rs.sections.add({id: "tabs-fill", html: '<nav class="rs-tabs" data-fill data-tint><button class="rs-tab on" data-tab="flow" data-icon="car">Traffic flow</button><button class="rs-tab" data-tab="speed" data-icon="gauge">Speed</button><button class="rs-tab" data-tab="noise" data-icon="volume">Noise<span class="rs-count">3</span></button></nav>' +
+      '<div data-pane="flow"><p>The pane of the tab Traffic flow.</p></div><div data-pane="speed" hidden><p>The pane of the tab Speed.</p></div><div data-pane="noise" hidden><p>The pane of the tab Noise.</p></div>' +
+      '<p class="gl-out">&lt;nav class="rs-tabs" data-fill data-tint&gt;</p>'});
+    rs.tabs.use(document.querySelector('[data-rs-section="tabs-fill"] .rs-tabs'), () => {});
+  }},
+  {id: "tabs-top", name: "Tabs with the icon over the label", make(){
+    rs.sections.add({id: "tabs-top", html: '<nav class="rs-tabs" data-icons="top" data-fill><button class="rs-tab on" data-tab="flow" data-icon="car">Traffic flow</button><button class="rs-tab" data-tab="speed" data-icon="gauge">Speed</button><button class="rs-tab" data-tab="noise" data-icon="volume">Noise<span class="rs-count">3</span></button></nav>' +
+      '<div data-pane="flow"><p>The pane of the tab Traffic flow.</p></div><div data-pane="speed" hidden><p>The pane of the tab Speed.</p></div><div data-pane="noise" hidden><p>The pane of the tab Noise.</p></div>' +
+      '<p class="gl-out">&lt;nav class="rs-tabs" data-icons="top" data-fill&gt;</p>'});
+    rs.tabs.use(document.querySelector('[data-rs-section="tabs-top"] .rs-tabs'), () => {});
+  }},
   {id: "switch", name: "Two-way switch", make(){
     rs.sections.add({id: "switch", html: '<div class="rs-seg" id="gl-seg"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div><p class="gl-out" id="seg-out">onChange: none yet</p>'});
     rs.tabs.use(document.getElementById("gl-seg"), v => out("seg-out", `onChange: <b>${v}</b>`));
