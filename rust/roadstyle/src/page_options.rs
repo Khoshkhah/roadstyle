@@ -796,7 +796,8 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>, lazy: bool, salt:
     }
     let own: Vec<String> = archives.iter().map(|(k, _)| k.clone()).collect();
     let rest: Vec<String> = names.iter().filter(|n| !own.contains(n)).cloned().collect();
-    let roads = match t.archive_of(bounds, &rest, true) {
+    // lazy: the page's own tiles (the roads, the base map, the boundary) are a file too, read by range requests (tiles gzipped one by one)
+    let roads = match t.archive_of(bounds, &rest, !lazy) {
         Ok(a) => {
             own_sources(&mut style, &own);
             lazy_layers(&mut style, &own);
@@ -805,16 +806,18 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>, lazy: bool, salt:
         // no road, base map or boundary has a tile (a page of overlays alone): the overlays stay in `roads`, which then has tiles
         Err(crate::tiles::Error::Empty) if !own.is_empty() => {
             archives.clear();
-            t.archive_in(bounds, &names, true)?
+            t.archive_in(bounds, &names, !lazy)?
         }
         Err(e) => return Err(e.into()),
     };
     let mut files: Vec<PageFile> = Vec::new();
     if lazy {
-        // the archives that are left here are the hidden overlays' own (own_sources): roads goes in below
+        // every archive is a file: the page's own (`roads`) and each hidden overlay's own (own_sources); the HTML has none
+        files.push(page_file(crate::tiles::SOURCE, FileKind::Tiles, roads, salt));
         files.extend(archives.drain(..).map(|(k, a)| page_file(&k, FileKind::Tiles, a, salt)));
+    } else {
+        archives.insert(0, (crate::tiles::SOURCE.to_string(), roads));
     }
-    archives.insert(0, (crate::tiles::SOURCE.to_string(), roads));
     // the rows of each overlay (all its properties and its box): the tiles have only the keys that the style reads
     let mut rows = Vec::new();
     let urls: Map<String, Value> = s.shown().filter(|(k, _)| o.wants(k) && !["simple", "slots"].contains(k)).filter_map(|(k, src)| {

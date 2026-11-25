@@ -76,9 +76,10 @@ def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when
     m = rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True,
                             overlays=[rs.Overlay(_zones(), kind="fill", label="zones", popup=["zone"]),
                                       rs.Overlay(_zones(), kind="fill", label="hidden", popup=["zone"], visible=False)])
-    assert all(f.startswith("rs-files/ov1-") for f in m.files), m.files
+    assert sorted(f.rsplit("-", 1)[0] for f in m.files) == ["rs-files/ov1", "rs-files/ov1", "rs-files/roads"], m.files
+    assert "__RS_PMTILES__" not in m.html and m.html.count("rs-files/") == 3          # the page's own tiles are a file too: the HTML has no archive
     m.save(path)
-    assert sorted(p.name.split(".", 1)[1] for p in (tmp_path / "rs-files").iterdir()) == ["json.gz", "pmtiles"]
+    assert sorted(p.name.split(".", 1)[1] for p in (tmp_path / "rs-files").iterdir()) == ["json.gz", "pmtiles", "pmtiles"]
     asked, ranges = [], []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -103,12 +104,12 @@ def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when
             page.goto("http://rs.test/l.html")
             page.wait_for_function("window.map && window.map.loaded() && map.areTilesLoaded()", timeout=60_000)
             assert page.evaluate("rsQuery(() => true, 'zones').length") == 3                  # the shown overlay: its rows are in the page
-            assert asked == ["l.html"]                                                        # no file of the hidden overlay yet
+            assert not [a for a in asked if "/ov1-" in a] and any("/roads-" in a for a in asked)   # the roads' tiles, no file of the hidden overlay yet
             page.evaluate("document.addEventListener('rs:select', e => { window.__sel = e.detail; })")
             page.evaluate("rsSetOverlay('zones', false); rsSetOverlay('hidden', true)")
             page.wait_for_function("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length > 0", timeout=20_000)
             page.wait_for_function("rsQuery(() => true, 'hidden').length === 3", timeout=20_000)
-            assert sorted({a.split(".", 1)[1] for a in asked[1:]}) == ["json.gz", "pmtiles"]
+            assert sorted({a.split(".", 1)[1] for a in asked if "/ov1-" in a}) == ["json.gz", "pmtiles"]
             assert ranges and all(r.endswith(".pmtiles") for r in ranges)                     # the archive: range requests only
             page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
             x, y = page.evaluate("(() => { const q = map.project([18.0045, 59.302]); return [q.x, q.y]; })()")

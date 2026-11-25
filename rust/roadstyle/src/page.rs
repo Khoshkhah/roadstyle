@@ -285,10 +285,10 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
                                     ("__RS_OPTIONS__", script_json(&Value::Object(opts))),
                                     ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
-    if !p.tiles.is_empty() || !page.ground.is_null() || !page.scene_3d.is_null() {
+    if !p.tiles.is_empty() || !p.tile_files.is_empty() || !page.ground.is_null() || !page.scene_3d.is_null() {
         parts = format!("<script>{}</script>", PMTILES_JS.replace("</script>", "<\\/script>"));       // the roads' archive and the ground's terrain file
     }
-    if !p.tiles.is_empty() {
+    if !p.tiles.is_empty() || !p.tile_files.is_empty() {
         let mut b64: Map<String, Value> = p.tiles.iter()
             .map(|(k, a)| (k.to_string(), base64::engine::general_purpose::STANDARD.encode(crate::tiles::pmtiles::gzip_at(a, 9)).into())).collect();
         // a file next to the page: the page fetches it at its first read
