@@ -126,3 +126,39 @@ def test_lazy_overlays_need_tiles():
     with pytest.raises(ValueError, match="needs tiles=True"):
         rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True, tiles=False,
                             overlays=[rs.Overlay(_zones(), kind="fill", label="hidden", visible=False)])
+
+
+def test_a_road_with_its_fill_off_is_two_borders_with_an_empty_middle(tmp_path):
+    """rsSetRoadFill(false): the casing of a road is drawn as its two borders around a gap of the fill's width, so what is under the road shows in
+    the middle (before, the casing was one wide solid line). rsSetRoadFill(true) gives the road its fill and its own widths back."""
+    import io
+
+    from PIL import Image
+    path = tmp_path / "f.html"
+    rs.render_dashboard(_edges(), basemap="blank").save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            page.evaluate("map.jumpTo({center: [18.0, 59.305], zoom: 17})")
+            page.wait_for_function("map.areTilesLoaded() && map.loaded()", timeout=20_000)
+
+            def row():                          # the pixels across the road 18.0 at its middle: [background far left, ..., the road's centre, ...]
+                page.wait_for_timeout(300)
+                x, y = page.evaluate("(() => { const q = map.project([18.0, 59.305]); return [q.x, q.y]; })()")
+                img = Image.open(io.BytesIO(page.screenshot())).convert("RGB")
+                return [img.getpixel((round(x) + d, round(y))) for d in range(-40, 41)]
+
+            on = row()
+            bg, mid = on[0], on[40]
+            assert mid != bg, "the fill is drawn"
+            page.evaluate("rsSetRoadFill(false)")
+            assert page.evaluate("map.getPaintProperty('roads-simple', 'line-gap-width')") is not None
+            off = row()
+            assert off[40] == bg, ("the middle shows what is under the road", off[40], bg)
+            edges = [d for d in range(-40, 41) if off[d + 40] != bg]
+            assert edges and min(edges) < 0 < max(edges), "a border at each side"
+            page.evaluate("rsSetRoadFill(true)")
+            assert row()[40] == mid and page.evaluate("map.getPaintProperty('roads-simple', 'line-gap-width')") is None
+        finally:
+            browser.close()
+    assert errors == []

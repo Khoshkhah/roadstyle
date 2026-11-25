@@ -14,6 +14,9 @@ pub struct PageInfo {
     pub fill_paint: Map<String, Value>,
     /// the dash patterns of the road layer's features (the pieces' and the items' `__rs_dash`), sorted: the page's simple-mode script
     pub dashes: Vec<String>,
+    /// the road layer's `line-width` and `line-gap-width` while the fill is off (rsSetRoadFill(false)): a casing piece is its two borders around a gap
+    /// of the fill's width, so what is under the road shows
+    pub outline: Value,
 }
 
 
@@ -187,17 +190,33 @@ fn bridge_ramp(cx: &Ctx) -> (Value, Value, impl Fn(&Value) -> f64) {
 
 /// The width curve of the road layer, by piece: the bridge's shadow and casing, the tunnel dashes, the casing, an item, else the fill.
 fn width_curve(cx: &Ctx, w: &Widths, items: bool) -> Value {
+    width_curve_of(cx, w, items, false)
+}
+
+/// The stops of two curves of the same zooms (`widths` makes them so, as `by_feature` reads them), each value `f(a, b)`.
+fn zip_stops(a: &Value, b: &Value, f: impl Fn(&Value, &Value) -> Value) -> Value {
+    let (a, b) = (a.as_array().unwrap(), b.as_array().unwrap());
+    let mut out = a[..3].to_vec();
+    for i in (3..a.len()).step_by(2) {
+        out.extend([a[i].clone(), f(&a[i + 1], &b[i + 1])]);
+    }
+    Value::Array(out)
+}
+
+/// `width_curve`; `outline`: each casing piece's width is one border, (casing - fill) / 2, for a line with a gap of the fill's width (`road_outline`).
+fn width_curve_of(cx: &Ctx, w: &Widths, items: bool, outline: bool) -> Value {
     let (m, s) = (&cx.look.model, &cx.look.sections);
+    let border = |c: Value| if outline { zip_stops(&c, &w.fill, |c, f| json!(["*", ["-", c, f], 0.5])) } else { c };
     let (is_c, is_sh, is_b) = (piece_kind(0), piece_kind(2), json!(["to-boolean", ["get", Mark::Bridge.name()]]));
     let (blur, extra) = (s.bridges.shadow.blur.f(), s.bridges.casing_extra.f());
     let (_, _, ramp) = bridge_ramp(cx);
     let bwide = plus_px(&w.wings, |z| json!(2.0 * extra * ramp(z)), None);
-    let mut wide = vec![(is_sh, plus_px(&w.wings, |z| json!(2.0 * (extra + blur) * ramp(z)), None)), (json!(["all", is_c, is_b]), bwide)];
+    let mut wide = vec![(is_sh, plus_px(&w.wings, |z| json!(2.0 * (extra + blur) * ramp(z)), None)), (json!(["all", is_c, is_b]), border(bwide))];
     if cx.any_tunnel {
         let px = json!(s.tunnels.dash_extra_px);
-        wide.push((json!(["any", piece_kind(3), piece_kind(4)]), plus_px(&w.casing, |_| px.clone(), None)));
+        wide.push((json!(["any", piece_kind(3), piece_kind(4)]), border(plus_px(&w.casing, |_| px.clone(), None))));
     }
-    wide.push((is_c, w.casing.clone()));
+    wide.push((is_c, border(w.casing.clone())));
     if items {     // 1 px over: two lanes side by side show no antialiased seam
         let px = json!(s.overlays.item_overlap_px);
         wide.push((piece_kind(5), plus_px(&metre_curve(&w.fill, Mark::ItemWidthM.name()), |_| px.clone(), None)));
@@ -211,6 +230,17 @@ fn width_curve(cx: &Ctx, w: &Widths, items: bool) -> Value {
 fn line_width(cx: &Ctx, w: &Widths, items: bool) -> Value {
     let (curve, live) = (width_curve(cx, w, items), json!(["coalesce", ["feature-state", LIVE_WIDTH], 1]));
     width_table::table_form(&curve, cx.hw, &cx.look.model.classes, &live).unwrap_or_else(|| times_each_stop(&curve, &live))
+}
+
+/// The road layer's paint while the fill is off (rsSetRoadFill(false), the dashboard swaps it in): a casing piece (and a tunnel's gap and dashes) is
+/// drawn as its two borders (`line-width` one border) around a gap of the fill's width (`line-gap-width`); every other piece as before, with no gap.
+/// `line-cap` butt: a round cap with a gap is a ring at each end of a piece.
+fn road_outline(cx: &Ctx, w: &Widths, items: bool) -> Value {
+    let live = json!(["coalesce", ["feature-state", LIVE_WIDTH], 1]);
+    let table = |curve: Value| width_table::table_form(&curve, cx.hw, &cx.look.model.classes, &live).unwrap_or_else(|| times_each_stop(&curve, &live));
+    let gap = by_feature(&[(json!(["any", piece_kind(0), piece_kind(3), piece_kind(4)]), w.fill.clone())], &zip_stops(&w.fill, &w.fill, |_, _| json!(0)));
+    let gap = if cx.pairs { cx.look.model.pair_width(cx.hw, &gap, w.metre_zoom) } else { gap };
+    json!({"line-width": table(width_curve_of(cx, w, items, true)), "line-gap-width": table(gap), "line-cap": "butt"})
 }
 
 /// _simple_color, with the glow of lean mode. R22 and audit N8 (2026-10-24), in every style: a road's colour (rsColor, rsColorBase,
@@ -680,6 +710,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let flt = road_filter(&cx, &items);
     let (paint, dashes) = line_paint(&cx, &w, &items, fills);
     info.dashes = dashes;
+    info.outline = road_outline(&cx, &w, !items.is_empty());
     let (road, pick, highlight) = road_pick_highlight(&cx, &w, &flt, paint);
     let ov = base_overlays(&cx, ovs, &mut info)?;
     let mut layers = ov.under;
