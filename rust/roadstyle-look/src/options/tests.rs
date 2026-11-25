@@ -70,3 +70,15 @@ fn a_flat_keyword_of_the_wrong_kind_is_an_error_that_names_it() {
     assert!(e(json!({"hover_color": "#zzz"})).contains("\"#zzz\" is not a colour"), "{}", e(json!({"hover_color": "#zzz"})));
     assert!(e(json!({"road_fill": "no"})).starts_with("map options: invalid type"), "{}", e(json!({"road_fill": "no"})));
 }
+
+#[test]
+fn with_overlays_moves_the_data_and_gives_what_with_args_gives() {
+    let list = json!([{"fc": {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"a": 1},
+                       "geometry": {"type": "Point", "coordinates": [18.0, 59.3]}}]}, "kind": "circle", "label": "Walls", "visible": false,
+                       "color_col": "C", "text_col": null}]);
+    let m = MapOptions::default();
+    let (want, _) = m.with_args(&json!({"overlays": list.clone()})).unwrap();
+    assert_eq!(m.with_overlays(list).unwrap(), want);
+    let e = m.with_overlays(json!([{"fc": {}, "lable": "x"}])).unwrap_err().to_string();
+    assert!(e.contains("unknown field \"lable\"; did you mean \"label\"?"), "{e}");
+}

@@ -152,12 +152,17 @@ const OVERLAY: &[(&str, &str)] = &[
 
 /// An overlay as the engine reads it today (rs.Overlay's fields, its data in `fc`) in the nested form.
 fn overlay_from_flat(o: &Value) -> Result<Value, Error> {
-    let o = o.as_object().ok_or_else(|| Error::Options(format!("overlays: each overlay is a mapping, not {o}")))?;
+    overlay_from_flat_owned(o.clone())
+}
+
+/// `overlay_from_flat` that moves the fields (the data of an overlay can be gigabytes: no copy).
+pub(super) fn overlay_from_flat_owned(o: Value) -> Result<Value, Error> {
+    let Value::Object(o) = o else { return Err(Error::Options(format!("overlays: each overlay is a mapping, not {o}"))) };
     let mut n = serde_json::to_value(Overlay::defaults()).expect("an overlay is JSON").as_object().cloned().unwrap_or_default();
-    for (k, v) in o.iter().filter(|(_, v)| !v.is_null()) {
+    for (k, v) in o.into_iter().filter(|(_, v)| !v.is_null()) {
         let to = OVERLAY.iter().find(|f| f.0 == k).map(|f| f.1)
-            .ok_or_else(|| Error::Options(format!("overlays: unknown field {k:?}{}", nearest(k, OVERLAY.iter().map(|f| f.0)))))?;
-        set(&mut n, to, v.clone());
+            .ok_or_else(|| Error::Options(format!("overlays: unknown field {k:?}{}", nearest(&k, OVERLAY.iter().map(|f| f.0)))))?;
+        set(&mut n, to, v);
     }
     Ok(Value::Object(n))
 }
