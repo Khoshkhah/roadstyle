@@ -160,8 +160,9 @@ def _look_of(kwargs):
     return _look_and_options(kwargs)[0]
 
 
-def _look_and_options(kwargs):
-    """_look_of's look and the options that it was resolved from (their args: the look's, ``page_from`` takes them from the look)."""
+def _look_and_options(kwargs, base_map=None):
+    """_look_of's look and the options that it was resolved from (their args: the look's, ``page_from`` takes them from the look).
+    ``base_map``: the base map of a duckOSM map ({mode, theme, paths, place}; duckosm.page)."""
     kwargs = dict(kwargs)
     palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
     features, overlays, items = kwargs.pop("features", None), kwargs.pop("overlays", None), kwargs.pop("items", None)
@@ -181,6 +182,8 @@ def _look_and_options(kwargs):
     if active:
         given = [*active, *(given if isinstance(given, list) else [given] if given is not None else [])]
     o = _look_options(palette, profile, given, kwargs, features)
+    if base_map is not None:
+        o["base_map"] = base_map
     lk = rust().resolve_look(json.dumps(o))
     # the tunnel look is checked by the look (the texts of render_web._tun_settings)
     sec = json.loads(lk.part("sections"))

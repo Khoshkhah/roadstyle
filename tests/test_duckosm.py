@@ -148,6 +148,35 @@ def test_the_page_of_a_duckosm_file(tmp_path):
     assert out.stat().st_size > 1000
 
 
+def test_a_duckosm_page_takes_the_keywords_of_render_dashboard(tmp_path):
+    """duckosm.page with a page's own data, as render_dashboard: overlays (rs.Overlay), a panel of its own (dashboard={...}), live
+    data, a page script, colour options, a boundary, a minzoom and exclude."""
+    import shapely
+
+    import roadstyle as rs
+    from roadstyle import duckosm
+
+    db = _tiny(tmp_path / "p.duckdb")
+    pts = __import__("geopandas").GeoDataFrame({"PK": [1, 2]}, geometry=shapely.points([[18.0, 59.0], [18.001, 59.0]]), crs=4326)
+    html = duckosm.page(db, "driving", levels="tags", overlays=[rs.Overlay(pts, kind="circle", label="Walls", popup=["PK"])],
+                        dashboard={"panel": {"width_px": 400, "sections": [{"id": "own", "label": "Own", "html": "<p id='own-p'></p>"}]}},
+                        live_data=True, page_script="window.OWN_SCRIPT = 1;", color_options={"Class": {}},
+                        boundary=shapely.box(17.99, 58.99, 18.01, 59.01), minzoom={"residential": 15}).html
+    assert [o["label"] for o in _opt(html, "overlays")][-1] == "Walls"           # after the base map's layers
+    assert _opt(html, "dashboard")["panel"]["width_px"] == 400 and "own-p" in html
+    # include / exclude: the road classes, as render_edges takes them (the tiny file's roads are residential)
+    assert "residential" not in _opt(duckosm.page(db, "driving", levels="tags", exclude=["residential"]).html, "filter")["classes"]
+    assert "window.OWN_SCRIPT = 1;" in html and "roadstyle:live" in html
+    style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + len("const style = "))[0]
+    assert "boundary" in {lyr["id"] for lyr in style["layers"]} and [c["name"] for c in _opt(html, "color_options")] == ["Class"] and _opt(html, "filter")["minzoom"] == {"residential": 15}
+
+
+def _opt(html, key):
+    """One option of the page's RS_OPTIONS (static/web_template.html), as a Python value."""
+    at = html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = ")
+    return json.JSONDecoder().raw_decode(html, at)[0][key]
+
+
 def test_the_modes_column_names_the_modes_of_each_road():
     import pyarrow as pa
 

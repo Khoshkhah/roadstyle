@@ -12,6 +12,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 - **A SUMO run on a page from Python, with no build of your own** (`vehicles={"fcd": path, "net": path}`). A local file goes into the page: the FCD Parquet (`--fcd-output.geo true`) as a `data:` URL, `net.xml` and `routes` as their text. A URL stays a URL. With no `wasm`, the page gets roadstyle's vehicles module (in the package, about 5 MB in the page) and a play bar (play, pause, seek, speed). The release workflow builds the module (`rust/roadstyle-wasm/build_vehicles.sh`); in a source checkout, run that script. `rs.vehicles.load` takes `wasm_bin`, the bytes or the URL of the module's `.wasm` file (also in gzip). Test: `tests/test_vehicles.py` (the Monaco run of `roadstyle-sim`).
 
+- **`roadstyle.duckosm.page` takes the keywords of `render_dashboard`.** A page with its own data can now use the full map of a duckOSM file: `overlays=[rs.Overlay(...)]`, `dashboard={"panel": {...}, "toolbar": {...}}`, `live_data=True`, `page_script=`, `boundary=`, `color_options=`, `minzoom=`, `include=` / `exclude=` and `palette=` / `profile=` / `settings=`. Before, an overlay gave "Object of type Overlay is not JSON serializable", and `dashboard` was `True` or `False` only. The page converts the keywords as `render_edges` does. Test: `tests/test_duckosm.py`.
+
 ### Fixed
 
 - **`roadstyle.duckosm.page(..., vehicles=...)` (the page of duckOSM's `net.map`) plays the run.** It took the option as it was, so the page had no vehicles module: "rs.vehicles.load: wasm is missing". Now both page writers make the option ready as `render_edges` does: the local files, roadstyle's vehicles module and the play bar.
