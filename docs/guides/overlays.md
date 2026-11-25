@@ -68,7 +68,11 @@ m.save("site/noise.html")        # writes noise.html and the folder site/rs-file
 
 ### Read the data of each overlay only when its files are written
 
-With many large hidden overlays, the page's own data can be larger than the memory. Give `data=` as a function that gives the overlay's data, and `kind=`:
+With `lazy_overlays=True`, roadstyle makes the files of the hidden overlays one at a time: the page has a small stand-in of each hidden overlay,
+and roadstyle tiles one overlay, writes its files and frees its tiles before the next. So the memory of the build is about the data that you give,
+not a copy of all of it.
+
+The data that you give can also be larger than the memory. Then give `data=` as a function that gives the overlay's data, and `kind=`:
 
 ```python
 table = pq.read_table("noise_surface.parquet").sort_by([("DGROUP", "ascending"), ("HEIGHT_M", "ascending")])   # read one time, as Arrow
@@ -78,8 +82,8 @@ overlays = [rs.Overlay(part(a, b), kind="fill", color_col="COLOR", label=..., vi
 m = rs.duckosm.page(db, overlays=overlays, lazy_overlays=True)
 ```
 
-- The page has a small stand-in of each such overlay. Then roadstyle calls the function of one overlay, writes that overlay's tiles and rows, and
-  frees the data before the next overlay. It calls each function one time.
+- Roadstyle calls the function of one overlay, writes that overlay's tiles and rows, and frees the data before the next overlay. It calls each
+  function one time.
 - The overlay must be hidden at the start (`visible=False`) and have no `edge_col`. Give `kind=`: roadstyle does not read the data before it makes
   the page. Without `lazy_overlays=True`, a function is an error.
 - Keep the data compact until the function runs: an Arrow table, or a Parquet file with one row group for each overlay (`filters=` then reads only
