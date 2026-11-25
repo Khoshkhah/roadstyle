@@ -149,6 +149,8 @@ export function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojso
 // the features of an inline source of the roads style that has no table (decks, slots, overlays); src: the source's id in the map
 // An overlay in tiles (way A: the embedded archive) has no GeoJSON: its rows (properties and box, `overlays.js`) stand in as features with no geometry.
 export const OV_ROWS = new Map();
+// overlays.js sets these: fetch an overlay's rows (`fetch`), and fetch them if the overlay shows and has a popup, a click or a tooltip (`shown`)
+export const _ovAsk = {fetch: () => {}, shown: () => {}};
 export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features) || OV_ROWS.get(src) || []; }
 // THE ROAD TABLE: each road's fields, midpoint, bbox and line, keyed by the row ({props, mids, bboxes, lines}, as stage 1
 // makes it). The page gives it (options.road_table, or window.RS_SIDE: the page loads it after the style and then sends rs:tableready).
@@ -222,6 +224,7 @@ export function _lyr(name){   // -> {src, ov} | null; ov null = the roads (the r
 }
 export function rsQuery(test, layer){
   const L=_lyr(layer); if(!L) return [];
+  if(L.ov) _ovAsk.fetch(L.ov);   // a lazy overlay's rows: fetched at the first ask
   const out=[];
   if(!L.ov){ for(let i=0, n=RoadTable.rows(); i<n; i++){ try{ if(test(RoadTable.props(i))) out.push(i); }catch(e){} } return out; }
   _sfeats(L.src).forEach((f,i)=>{ try{ if(test(f.properties||{})) out.push(i); }catch(e){} });
@@ -229,6 +232,7 @@ export function rsQuery(test, layer){
 }
 export function rsGetProps(ids, layer){ // the rows behind an id set (internals stripped) — table-ready
   const L=_lyr(layer); if(!L) return [];
+  if(L.ov) _ovAsk.fetch(L.ov);   // a lazy overlay's rows: fetched at the first ask
   const fs = L.ov ? _sfeats(L.src) : null;
   return Array.from(ids||[]).map(i=>{
     const p=(fs ? fs[i]&&fs[i].properties : RoadTable.props(i))||{}; const r={};
@@ -299,6 +303,7 @@ function _bbExtend(c, bb){  // walk any GeoJSON coordinates nesting (Point .. Mu
 }
 export function rsFocus(ids, opt, layer){ // fly the camera to an id (or id set); opt -> fitBounds
   const L=_lyr(layer); if(!L) return;
+  if(L.ov) _ovAsk.fetch(L.ov);   // a lazy overlay's rows: fetched at the first ask
   const fs = L.ov ? _sfeats(L.src) : null, bb={ok:false, minx:1/0, miny:1/0, maxx:-1/0, maxy:-1/0};
   (Array.isArray(ids)?ids:[ids]).forEach(i=>{
     if(!fs){ const b=RoadTable.bbox(i);
