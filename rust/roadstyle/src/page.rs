@@ -100,6 +100,9 @@ pub struct PageOptions {
     /// a tiled page: the boundary's GeoJSON (its outline is a tile layer; boundary.js reads the shape here). Null: the boundary's source has it
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub boundary_shape: Value,
+    /// a tiled page: the hidden overlays that are not in the starting style, `{order, sources}` (page_options.rs `lazy_layers`; overlays.js adds them)
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub overlay_layers: Value,
     pub overlay_popup: bool,
     pub tunnel: Value,
     pub fill_layers: Value,
@@ -282,10 +285,10 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
                                     ("__RS_OPTIONS__", script_json(&Value::Object(opts))),
                                     ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
-    if !p.tiles.is_empty() || !page.ground.is_null() || !page.scene_3d.is_null() {
+    if !p.tiles.is_empty() || !p.tile_files.is_empty() || !page.ground.is_null() || !page.scene_3d.is_null() {
         parts = format!("<script>{}</script>", PMTILES_JS.replace("</script>", "<\\/script>"));       // the roads' archive and the ground's terrain file
     }
-    if !p.tiles.is_empty() {
+    if !p.tiles.is_empty() || !p.tile_files.is_empty() {
         let mut b64: Map<String, Value> = p.tiles.iter()
             .map(|(k, a)| (k.to_string(), base64::engine::general_purpose::STANDARD.encode(crate::tiles::pmtiles::gzip_at(a, 9)).into())).collect();
         // a file next to the page: the page fetches it at its first read

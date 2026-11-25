@@ -50,11 +50,11 @@ def test_a_hidden_overlay_has_its_own_source_and_loads_no_tile_until_it_shows(tm
         try:
             page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
             src = page.evaluate("map.getStyle().sources")
-            assert src["ov1"]["tiles"] == ["pmtiles://ov1/{z}/{x}/{y}"] and "url" not in src["ov1"], src["ov1"]
-            assert page.evaluate("window.__rs_tiles.archives") == ["roads", "ov1"] and "ov0" not in src
-            assert page.evaluate("map.getStyle().layers.filter(l => l['source-layer'] === 'ov1').map(l => l.source)") == ["ov1", "ov1"]
+            own = page.evaluate("O.overlay_layers.sources.ov1")         # hidden: out of the starting style, in the page's options
+            assert own["source"]["tiles"] == ["pmtiles://ov1/{z}/{x}/{y}"] and "url" not in own["source"], own["source"]
+            assert page.evaluate("window.__rs_tiles.archives") == ["roads", "ov1"] and "ov0" not in src and "ov1" not in src
+            assert [l["source"] for l in own["layers"]] == ["ov1", "ov1"] and all(l["source-layer"] == "ov1" for l in own["layers"])
             assert page.evaluate("map.querySourceFeatures('roads', {sourceLayer: 'ov0'}).length") > 0
-            assert page.evaluate("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length") == 0       # hidden: no tile asked for
             page.evaluate("document.addEventListener('rs:select', e => { window.__sel = e.detail; })")
             page.evaluate("rsSetOverlay('zones', false); rsSetOverlay('hidden', true)")
             page.wait_for_function("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length > 0", timeout=20_000)
@@ -76,9 +76,10 @@ def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when
     m = rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True,
                             overlays=[rs.Overlay(_zones(), kind="fill", label="zones", popup=["zone"]),
                                       rs.Overlay(_zones(), kind="fill", label="hidden", popup=["zone"], visible=False)])
-    assert all(f.startswith("rs-files/ov1-") for f in m.files), m.files
+    assert sorted(f.rsplit("-", 1)[0] for f in m.files) == ["rs-files/ov1", "rs-files/ov1", "rs-files/roads"], m.files
+    assert "__RS_PMTILES__" not in m.html and m.html.count("rs-files/") == 3          # the page's own tiles are a file too: the HTML has no archive
     m.save(path)
-    assert sorted(p.name.split(".", 1)[1] for p in (tmp_path / "rs-files").iterdir()) == ["json.gz", "pmtiles"]
+    assert sorted(p.name.split(".", 1)[1] for p in (tmp_path / "rs-files").iterdir()) == ["json.gz", "pmtiles", "pmtiles"]
     asked, ranges = [], []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -103,12 +104,12 @@ def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when
             page.goto("http://rs.test/l.html")
             page.wait_for_function("window.map && window.map.loaded() && map.areTilesLoaded()", timeout=60_000)
             assert page.evaluate("rsQuery(() => true, 'zones').length") == 3                  # the shown overlay: its rows are in the page
-            assert asked == ["l.html"]                                                        # no file of the hidden overlay yet
+            assert not [a for a in asked if "/ov1-" in a] and any("/roads-" in a for a in asked)   # the roads' tiles, no file of the hidden overlay yet
             page.evaluate("document.addEventListener('rs:select', e => { window.__sel = e.detail; })")
             page.evaluate("rsSetOverlay('zones', false); rsSetOverlay('hidden', true)")
             page.wait_for_function("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length > 0", timeout=20_000)
             page.wait_for_function("rsQuery(() => true, 'hidden').length === 3", timeout=20_000)
-            assert sorted({a.split(".", 1)[1] for a in asked[1:]}) == ["json.gz", "pmtiles"]
+            assert sorted({a.split(".", 1)[1] for a in asked if "/ov1-" in a}) == ["json.gz", "pmtiles"]
             assert ranges and all(r.endswith(".pmtiles") for r in ranges)                     # the archive: range requests only
             page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
             x, y = page.evaluate("(() => { const q = map.project([18.0045, 59.302]); return [q.x, q.y]; })()")
@@ -276,3 +277,83 @@ def test_data_as_a_function_needs_lazy_overlays_and_a_kind():
         rs.render_dashboard(_edges(), basemap="blank", overlays=[rs.Overlay(_zones, kind="fill", visible=False)])
     with pytest.raises(ValueError, match="needs kind="):
         rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True, overlays=[rs.Overlay(_zones, visible=False)])
+
+
+def test_a_thousand_hidden_overlays_are_not_in_the_starting_style(tmp_path):
+    """The caller's hidden overlays with a source of their own are outside the starting style (O.overlay_layers): MapLibre walks every layer at each
+    frame, and a page of 1,215 hidden overlays could not pan. rsSetOverlay(label, true) adds the overlay's source and layers at their place (an
+    "under" overlay under the roads), with its click and its tooltip; false takes them away. A paint change made while it is out (a page's script)
+    is in the layer when it shows."""
+    import geopandas as gpd
+    from shapely.geometry import box
+    n = 1000
+    cells = [gpd.GeoDataFrame({"k": [i]}, geometry=[box(18.0 + (i % 40) * 1.5e-4, 59.3 + (i // 40) * 4e-4, 18.0001 + (i % 40) * 1.5e-4, 59.3003 + (i // 40) * 4e-4)],
+                              crs=4326) for i in range(n)]
+    ovs = [rs.Overlay(c, kind="fill", label=f"cell {i}", placement="under", visible=False, popup=["k"]) for i, c in enumerate(cells)]
+    path = tmp_path / "t.html"
+    rs.render_dashboard(_edges(), basemap="blank", overlays=[rs.Overlay(_zones(), kind="fill", label="zones", popup=["zone"])] + ovs).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            st = page.evaluate("(() => { const s = map.getStyle(); return {layers: s.layers.length, sources: Object.keys(s.sources).length, lazy: Object.keys(O.overlay_layers.sources).length}; })()")
+            assert st["lazy"] == n and st["layers"] < 60 and st["sources"] < 10, st
+            moves = "(map._delegatedListeners.mousemove || []).length"     # MapLibre queries each layer with a handler at each mouse move
+            at_load = page.evaluate(moves)
+            assert at_load < 20, at_load
+            src = page.evaluate("RS_OVERLAYS.find(o => o.label === 'cell 0').source")
+            lid = page.evaluate(f"O.overlay_layers.sources['{src}'].layers[0].id")
+            page.evaluate(f"map.setPaintProperty('{lid}', 'fill-color', '#ff0000')")              # a page's change while the overlay is out
+            page.evaluate("rs.tooltip('cell 0', p => ({title: 'Cell', rows: [['k', p.k]]})); rsSetOverlay('zones', false); rsSetOverlay('cell 0', true)")
+            ids = page.evaluate("map.getStyle().layers.map(l => l.id)")
+            assert lid in ids and ids.index(lid) < ids.index("roads-simple"), "under the roads"
+            assert page.evaluate(f"map.getPaintProperty('{lid}', 'fill-color')") == "#ff0000"
+            assert page.evaluate(f"map.getLayoutProperty('{lid}', 'visibility')") == "visible"
+            page.evaluate("map.jumpTo({center: [18.00005, 59.30015], zoom: 18})")
+            page.wait_for_function("map.areTilesLoaded() && map.loaded()", timeout=20_000)
+            page.evaluate("document.addEventListener('rs:select', e => { window.__sel = e.detail; })")
+            x, y = page.evaluate("(() => { const q = map.project([18.00005, 59.30015]); return [q.x, q.y]; })()")
+            page.mouse.move(x - 40, y)
+            page.mouse.move(x, y)
+            page.wait_for_selector(".rs-tip .maplibregl-popup-content", timeout=5_000)
+            assert page.inner_html(".rs-tip .maplibregl-popup-content").startswith("<b>Cell</b><br><b>k</b>: 0")
+            page.mouse.click(x, y)
+            page.wait_for_function("window.__sel", timeout=5_000)
+            assert page.evaluate("window.__sel.overlay") == "cell 0" and page.evaluate("window.__sel.properties.k") == 0
+            assert page.evaluate(moves) <= at_load + 2                          # zones off, cell 0 on
+            page.evaluate("rsSetOverlay('cell 0', false)")
+            assert page.evaluate(f"[!!map.getSource('{src}'), !!map.getLayer('{lid}')]") == [False, False]
+            assert page.evaluate(moves) < at_load                               # hidden: no handler
+            page.evaluate("rsSetOverlay('cell 0', true)")                    # again: its definition kept the change
+            assert page.evaluate(f"map.getPaintProperty('{lid}', 'fill-color')") == "#ff0000"
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_a_zoom_or_a_jump_during_the_move_back_into_the_boundary_breaks_nothing(tmp_path):
+    """boundary_limit: a pan past the edge starts a move back; a zoom and a jump during it stop it. Before, the move back started inside the
+    moveend that stop() fires, and MapLibre's render loop threw at each frame (a blank map that did not move again); and a center a rounding outside
+    the limits eased for ever. Now: no page error, and the map is still after a second."""
+    from shapely.geometry import box
+    path = tmp_path / "e.html"
+    rs.render_dashboard(_edges(), basemap="blank", boundary=box(17.999, 59.299, 18.006, 59.311), boundary_limit=True).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        try:
+            page.wait_for_function("map.getMinZoom() > 5", timeout=10_000)
+            for _ in range(3):
+                page.evaluate("map.jumpTo({center: [18.2, 59.4]})")                     # past the edge: the move back starts
+                page.wait_for_timeout(60)
+                page.evaluate("map.zoomTo(map.getZoom() + 0.5, {duration: 80})")       # stops the move back
+                page.wait_for_timeout(20)
+                page.evaluate("map.jumpTo({center: [18.003, 59.305]})")
+                page.wait_for_timeout(40)
+            page.evaluate("map.easeTo({center: [18.1, 59.305], duration: 100})")     # to the edge: the center ends at the limit
+            page.wait_for_timeout(1500)
+            assert page.evaluate("map.isMoving()") is False
+            page.evaluate("map.zoomTo(map.getZoom() + 1, {duration: 0})")           # the map still moves
+            assert page.evaluate("map.isMoving()") is False
+        finally:
+            browser.close()
+    assert errors == []

@@ -87,9 +87,48 @@ const _ovAllLayers = ov => {
   const role = ov.source.slice(RS_PREFIX.length);
   return [...new Set([...ov.layers, ...map.getStyle().layers.filter(l=>_role(l)===role).map(l=>l.id)])].filter(id=>map.getLayer(id));
 };
+// Hidden overlays outside the starting style (O.overlay_layers, page_options.rs `lazy_layers`): an overlay's source and layers are added when it shows,
+// each layer before the next layer of the style's order that the map has, and taken away when it hides. A page of a thousand hidden overlays then pans
+// as fast as one with none (MapLibre walks every layer of the style at each frame).
+const _ovLazyOf = ov => ((O.overlay_layers || {}).sources || {})[ov.source];
+function _ovLazyAdd(ov){
+  const z = _ovLazyOf(ov), order = O.overlay_layers.order;
+  if(!z || map.getSource(ov.source)) return;
+  map.addSource(ov.source, z.source);
+  for(const l of z.layers){
+    const i = order.indexOf(l.id), before = order.slice(i + 1).find(id => map.getLayer(id));
+    map.addLayer({...l, layout: {...(l.layout || {}), visibility: "visible"}}, before);
+  }
+}
+function _ovLazyRemove(ov){
+  const z = _ovLazyOf(ov);
+  if(!z || !map.getSource(ov.source)) return;
+  if(_ovSel && _ovSel.source === ov.source) clearOvSel();
+  if(_ovHov && _ovHov.source === ov.source) _ovHov = null;
+  // the page's own changes of a layer (paint, layout, filter) stay in its definition for the next time it shows
+  for(const l of z.layers) if(map.getLayer(l.id)){ const s = map.getStyle().layers.find(x => x.id === l.id); Object.assign(l, {paint: s.paint, layout: s.layout, filter: s.filter}); map.removeLayer(l.id); }
+  map.removeSource(ov.source);
+}
+// A page's script can change a layer of a hidden overlay while it is out of the map (noise-map sets its points' colour at the start): get and set of
+// paint, layout and filter on such a layer read and change its definition, which the overlay is added with.
+function _ovLazyCalls(){
+  if(!O.overlay_layers || map.__rsLazy) return;
+  map.__rsLazy = true;
+  const out = id => { if(map.getLayer(id)) return null; for(const z of Object.values(O.overlay_layers.sources)){ const l = z.layers.find(x => x.id === id); if(l) return l; } return null; };
+  const wrap = (name, f) => { const own = map[name].bind(map); map[name] = (id, ...a) => { const l = out(id); return l ? f(l, ...a) : own(id, ...a); }; };
+  wrap("getPaintProperty", (l, k) => (l.paint || {})[k]);
+  wrap("setPaintProperty", (l, k, v) => { (l.paint = l.paint || {})[k] = v; return map; });
+  wrap("getLayoutProperty", (l, k) => (l.layout || {})[k]);
+  wrap("setLayoutProperty", (l, k, v) => { if(k !== "visibility") (l.layout = l.layout || {})[k] = v; return map; });   // rsSetOverlay decides if it shows
+  wrap("getFilter", l => l.filter);
+  wrap("setFilter", (l, f) => { l.filter = f; return map; });
+}
 export function rsSetOverlay(labelOrIdx, on){
   const i = typeof labelOrIdx==="number" ? labelOrIdx : OVERLAYS.findIndex(o=>o.label===labelOrIdx);
   const ov = OVERLAYS[i]; if(!ov) return;
+  if(_ovLazyOf(ov)) on ? _ovLazyAdd(ov) : _ovLazyRemove(ov);
+  if(on) ov.layers.forEach(_ovBind);
+  else { if(_ovHov && _ovHov.ov === ov){ _ovState(_ovHov, {hover:false}); _ovHov = null; if(_ovTip) _ovTip.remove(); } ov.layers.forEach(_ovUnbind); }
   _ovAllLayers(ov).forEach(id=>map.setLayoutProperty(id,"visibility", on?"visible":"none"));
   ov.visible = !!on;
   if(on) _ovFetch(ov);
@@ -104,7 +143,9 @@ function _ovRow(ov, rule){
 }
 // the hover tooltip and the hover glow of an overlay's layer, made once for each layer id of the map: the handlers find the overlay of the layer
 // at each move, so a layer that a later style brings (the same ids) has the overlay of the new style
-const _ovBound = new Set();
+// Only a shown overlay has them: MapLibre runs a query of each layer that has a handler at each mouse move, and noise-map's page, with handlers on all
+// 4,883 layers of its 1,215 overlays, took 4 s for one mouse move (2026-11-25). rsSetOverlay binds them when the overlay shows and takes them away when it hides.
+const _ovBound = new Map();     // layer id -> its mousemove and mouseleave handlers
 const _ovOfLayer = id => OVERLAYS.find(o=>o.layers.includes(id));
 // rsSetInteraction can make a layer clickable, or give it its tooltip, later; the handlers read ov.interactive and ov.tooltip on each move
 // rsSetTooltip(label, fn) (rs.tooltip): the hover tooltip of an overlay, made by the page: fn(properties) gives {title, rows: [[name, value], ...]} (the
@@ -120,8 +161,7 @@ const _ovTipHtml = t => [t.title != null && t.title !== "" ? "<b>" + _esc(t.titl
 const _ovTips = ov=>!!_ovTipFn[ov.label] || ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   // true: every field (rsSetInteraction, a layer with no list)
 function _ovBind(id){
   if(_ovBound.has(id)) return;
-  _ovBound.add(id);
-  map.on("mousemove", id, e=>{ if(_NO_HOVER.matches) return; const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
+  const move = e=>{ if(_NO_HOVER.matches) return; const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
     map.getCanvas().style.cursor = ov.interactive ? "pointer" : "";   // hover -> recolour, once the mouse rests on it (_TIP_DELAY)
     const f = e.features && e.features[0]; if(!f) return;
     const k={source:f.source, sourceLayer:f.sourceLayer, id:f.id, ov}, same=o=>!!o && o.source===k.source && o.sourceLayer===k.sourceLayer && o.id===k.id;
@@ -133,10 +173,17 @@ function _ovBind(id){
       if(_ovTip && _ovTips(ov)){
         const fn = _ovTipFn[ov.label], t = fn ? fn(props) : null;          // the page's own tooltip (rs.tooltip), else the overlay's fields
         const html = fn ? (t ? _ovTipHtml(t) : "") : _rfields(props, ov.tooltip===true ? null : ov.tooltip);
-        if(html){ _ovTip.setLngLat(ll).setHTML(html); if(!_ovTip.isOpen()) _ovTip.addTo(map); } else _ovTip.remove(); } }, _TIP_DELAY); });
-  map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor=""; clearTimeout(_ovT); _ovUnder=null;
+        if(html){ _ovTip.setLngLat(ll).setHTML(html); if(!_ovTip.isOpen()) _ovTip.addTo(map); } else _ovTip.remove(); } }, _TIP_DELAY); };
+  const leave = ()=>{ map.getCanvas().style.cursor=""; clearTimeout(_ovT); _ovUnder=null;
     _ovState(_ovHov,{hover:false}); _ovHov=null;
-    if(_ovTip) _ovTip.remove(); });
+    if(_ovTip) _ovTip.remove(); };
+  map.on("mousemove", id, move); map.on("mouseleave", id, leave);
+  _ovBound.set(id, [move, leave]);
+}
+function _ovUnbind(id){
+  const h = _ovBound.get(id); if(!h) return;
+  map.off("mousemove", id, h[0]); map.off("mouseleave", id, h[1]);
+  _ovBound.delete(id);
 }
 // The Layers box: one row for each overlay, in the panel's Roads card (panel mode) or in a box of its own; a new style takes the rows of the old one away
 // and brings its own (a box with no row is taken away). The labels that the person turned off stay off.
@@ -168,9 +215,10 @@ function _ovBoxRows(){
 // the overlays of the style of the moment (at the start, and again for a new style: rs.setStyle): their handlers, their rows, and their start state
 export function useOverlays(){
   _OV_POPUP = O.overlay_popup;
+  _ovLazyCalls();
   clearOvSel(); _ovHov = null; _ovUnder = null;
   if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
-  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); ov.layers.forEach(_ovBind); if((_ovGroupOff && _ovGroup().includes(ov)) || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
+  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); if(ov.visible0) ov.layers.forEach(_ovBind); if((_ovGroupOff && _ovGroup().includes(ov)) || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
   window.RS_OVERLAYS = OVERLAYS;
   _ovBoxRows();
   _emit("rs:overlayschange", {visible: rsGetOverlays()});       // the base-map box and the legend box read the layers again

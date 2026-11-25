@@ -29,10 +29,16 @@ export function initBoundary(){
   const dimOpacity = () => dark() ? rules.dim_dark : rules.dim_light;
   if(!_bdBound){
     _bdBound = true;
+    // The move back into the limits starts after the moveend, not in it: a zoom or a drag that stops the move back makes MapLibre fire moveend from
+    // stop(), and an easeTo there broke the render loop ("this._onEaseFrame is not a function" at each frame: a blank map that did not move again).
+    // The center at the edge can be a rounding (2e-10 degrees) outside the limits: a difference under 1e-7 degrees is no move (else it eased for ever).
     map.on("moveend", () => {
       if(!_bdLim) return;
-      const c = map.getCenter(), x = Math.min(_bdLim.hi[0], Math.max(_bdLim.lo[0], c.lng)), y = Math.min(_bdLim.hi[1], Math.max(_bdLim.lo[1], c.lat));
-      if(x !== c.lng || y !== c.lat) map.easeTo({center: [x, y], duration: 250});
+      setTimeout(() => {
+        if(!_bdLim || map.isMoving()) return;
+        const c = map.getCenter(), x = Math.min(_bdLim.hi[0], Math.max(_bdLim.lo[0], c.lng)), y = Math.min(_bdLim.hi[1], Math.max(_bdLim.lo[1], c.lat));
+        if(Math.abs(x - c.lng) > 1e-7 || Math.abs(y - c.lat) > 1e-7) map.easeTo({center: [x, y], duration: 250});
+      }, 0);
     });
     map.on("resize", () => { if(_bdZoom) _bdZoom(); });
     document.addEventListener("rs:themechange", () => { if(map.getLayer("rs-boundary-dim")) map.setPaintProperty("rs-boundary-dim", "fill-opacity", dimOpacity()); });
