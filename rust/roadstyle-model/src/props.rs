@@ -240,7 +240,20 @@ pub const POPUPS: &str = "roadstyle:popups";
 
 /// `POPUPS` of a style.
 pub fn overlay_popups(metadata: &Value) -> std::collections::HashMap<String, Vec<String>> {
-    metadata[POPUPS].as_object().into_iter().flatten()
+    by_source(metadata, POPUPS)
+}
+
+/// The metadata key of the keys that a base-map layer's tiles keep beside what its layers read, by its source: `{source: [key]}` (layers.yaml
+/// `tile_keys`: the buildings' `osm_id`, so a page has a building's id in the tile itself).
+pub const TILE_KEYS: &str = "roadstyle:tile_keys";
+
+/// `TILE_KEYS` of a style.
+pub fn tile_keys(metadata: &Value) -> std::collections::HashMap<String, Vec<String>> {
+    by_source(metadata, TILE_KEYS)
+}
+
+fn by_source(metadata: &Value, key: &str) -> std::collections::HashMap<String, Vec<String>> {
+    metadata[key].as_object().into_iter().flatten()
         .map(|(k, v)| (k.clone(), v.as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect())).collect()
 }
 

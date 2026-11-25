@@ -124,6 +124,12 @@ fn the_64_looks_of_mapstyle() {
                 *t = 16.0.into();
             }
         }
+        // added on 2026-11-25: the keys that a base-map layer's tiles keep (layers.yaml tile_keys: the buildings' osm_id)
+        for l in got.pointer_mut("/features/layers_yaml/layers").and_then(Value::as_array_mut).into_iter().flatten() {
+            if let Some(l) = l.as_object_mut() {
+                l.shift_remove("tile_keys");
+            }
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }
