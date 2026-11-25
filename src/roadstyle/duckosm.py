@@ -152,22 +152,35 @@ def export_inline(db, mode: str = "all", *, theme: str = "liberty", paths: str =
 
 
 def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google", layers=True, levels: str = "auto",
-         only: bool = False, interaction: dict = None, dashboard: bool = False, **kwargs):
+         only: bool = False, interaction: dict = None, dashboard: bool | dict = False, **kwargs):
     """mapstyle's ``render_map`` on the Rust engine: the page of the duckOSM file ``db`` (``read``, its roads in the style of ``mode``, the
     base map of ``features.*`` with ``layers``, the shared dashboard with the base map's controls: modes, kinds, each layer's clicks,
     tooltip and popup). ``interaction``: a layer's start ``{clickable, tooltip, popup}`` (e.g. ``{"landcover": {"clickable": True}}``).
     ``dashboard=False`` (the default) is the dashboard without a panel: the map and the toolbox (``template="dashboard"``, ``dashboard={"panel": None}``).
-    ``dashboard=True``: roadstyle's dashboard page, docked (``template="dashboard", layout="dock"``). ``kwargs``: render_edges' keywords (``basemap``, ``tiles``,
-    ``template``, ...). Gives a ``WebMap`` (``.save(path)``)."""
+    ``dashboard=True``: roadstyle's dashboard page, docked (``template="dashboard", layout="dock"``). ``dashboard={...}``: the dashboard of
+    ``render_dashboard`` (``{"panel": {"sections": [...], "width_px": 400}, "toolbar": {...}}``), for a page with its own panel.
+    ``kwargs``: render_edges' keywords, as ``render_dashboard`` takes them (``overlays``, ``boundary``, ``live_data``, ``page_script``,
+    ``color_options``, ``minzoom``, ``basemap``, ``tiles``, ``palette``, ...). Gives a ``WebMap`` (``.save(path)``)."""
     from . import render_web as rw
-    from ._engine import _warn, page_given, rust
+    from ._engine import _look_and_options, _warn, page_given, rust
     from .render import vehicles_option
 
     if kwargs.get("planner"):
         raise ValueError("duckosm.page has no route planner yet: use mapstyle's render_map(planner=True)")
     roads, features, level_kw = read(db, mode, levels=levels, layers=layers, only=only)
+    inc, exc, links = kwargs.pop("include", None), kwargs.pop("exclude", None), kwargs.pop("match_links", True)
+    if inc is not None or exc is not None:          # render_edges' road classes (filter_edges), before the engine as render_page does
+        import pandas as pd
+
+        from .filters import filter_edges
+        keep = filter_edges(pd.DataFrame({"highway": roads.column("highway").to_pylist()}), inc, exc, match_links=links).index
+        roads = roads.take(keep.to_numpy())
+        if isinstance(level_kw, dict):              # the stored levels' check of these roads: a subset, as with only=True
+            from .levels_store import _hash
+            ids = roads.column("edge_id").to_numpy().astype("int64")
+            level_kw = {**level_kw, "edge_hash": _hash(ids), "n_edges": len(ids)}
     kw = {**kwargs, "state": "live", **({"interaction": interaction} if interaction else {})}
-    if dashboard:
+    if dashboard is True:
         import yaml
 
         from . import _assets
@@ -176,16 +189,20 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
         # the panel shows the clicked road: no road hover tooltip
         kw = {"name": f"{Path(db).stem}: dashboard", "tooltip": None, "template": "dashboard", "layout": "dock",
               "color_options": {"Road class": {}, "Modes": {"color_by": "modes", "colors": colors}}, **kw}
+    elif dashboard:                                  # render_dashboard's dashboard: the page's own panel and toolbar
+        kw = {"template": "dashboard", "dashboard": dashboard, **kw}
     else:
         kw = {"template": "dashboard", "dashboard": {"panel": None}, **kw}
     if "ground" not in kw:
         kw["ground"] = ground(db)                    # the area's own ground when the file has one (the standard "The ground reference")
     kw = vehicles_option(kw)                         # a SUMO run: its local files, roadstyle's vehicles module and the play bar
-    o = _options(db, mode, theme, paths, level_kw, kw)
-    lk = rust().resolve_look(json.dumps(o))
+    # the keywords as render_edges converts them (overlays, boundary, chart rows, palette, profile, settings), over the duckOSM base map
+    style = {k: kw.get(k) for k in ("palette", "profile", "settings")}
+    lk, o = _look_and_options({**kw, **({"levels": level_kw} if level_kw is not None else {})},
+                              base_map=_options(db, mode, theme, paths, None, {})["base_map"])
     # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
     page = json.loads(lk.part("base_map_page"))
-    given = page_given({**{k: page.get(k) for k in ("basemap", "basemaps")}, **kw}, lk=lk, args=o["args"])
+    given = page_given({**{k: page.get(k) for k in ("basemap", "basemaps")}, **kw}, **style, lk=lk, args=o["args"])
     html = rust().page_from(roads, lk, json.dumps(o), json.dumps(given), features)
     _warn()
     return rw.WebMap(html)

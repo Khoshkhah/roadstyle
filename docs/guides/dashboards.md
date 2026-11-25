@@ -116,6 +116,38 @@ Each item below has the same form: a picture or a live page when there is one, a
     ).save("dashboard_dock.html")
     ```
 
+### Put your dashboard on the full map of a duckOSM file { .rs-part }
+
+**Use it for:** a dashboard with your own data on the full map of a duckOSM file: the roads of all modes, the base map of `features.*`, and the switches of its layers. Your page draws no base-map layer.<br>
+**From Python:** yes, `rs.duckosm.page(db, "all", dashboard={...}, ...)`
+{ .rs-facts }
+
+<!-- The fence is "py", not "python": this block needs a duckOSM file, so tests/test_dashboard_manual.py and docs/build_maps.py do not run it. -->
+=== "Python"
+
+    ```py
+    import roadstyle as rs
+    from roadstyle import duckosm
+
+    duckosm.page(
+        "norrmalm.duckdb", "all",
+        name="Traffic and noise",
+        overlays=[rs.Overlay(walls, kind="circle", label="Noise at the walls", popup=["PK"])],
+        live_data=True,                          # the page script calls rs.setData
+        boundary=area_outline,
+        dashboard={"panel": {"width_px": 400, "sections": [{"id": "when", "label": "When", "html": "<div id='when'></div>"}]}},
+        page_script=SCRIPT,
+    ).save("noise.html")
+    ```
+
+??? info "Details"
+
+    - `duckosm.page` reads the roads and the base map from the file. `dashboard={...}` is the same option as in `render_dashboard`: your panel and your toolbar.
+    - It takes the keywords of `render_dashboard`: `overlays`, `boundary`, `live_data`, `page_script`, `color_options`, `minzoom`, `include`, `exclude`, `basemap`, `tiles` and the others. For example, `exclude=["ferry"]` removes the ferry routes, which can go far out of the area.
+    - The key of `rs.setData` is the `edge_id` of the file as text: `String(edge_id)`.
+    - The base map is cut to the area of the file (`main.boundary`). Thus a large polygon, for example the sea, does not make the page large.
+    - `dashboard=True` is the docked dashboard of roadstyle with the colour option "Modes". `dashboard=False` (the default) has no panel.
+
 ## Options { .rs-group }
 
 ### Page keywords { .rs-part }
