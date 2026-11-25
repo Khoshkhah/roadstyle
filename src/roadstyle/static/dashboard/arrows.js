@@ -2,6 +2,7 @@
 import {map, style, O, RS_LOADED, _src, _sfeats, RoadTable, _emit} from "./core.js";
 import {_tunOn} from "./tunnel.js";
 import {_svLanePx} from "./svspot.js";
+import {_roadVis} from "./filter.js";
 const ARROW_IMAGE = "rs-oneway";      // the arrow image of roadstyle: its own name, never the `oneway` image that a base map's sprite can have (it can point up)
 let _arSdf = null;         // the icon on the map is an SDF one (a map with tunnels) or not
 // The one-way arrows switch: the row "One-way arrows" of the base-map box and a page (rsSetArrows) show and set one state, kept in this browser
@@ -12,7 +13,7 @@ try{ _arOff = localStorage.getItem(_arKey) === "0"; }catch(e){ /* no storage: th
 const _arLayers = () => map.getStyle().layers.filter(l => l.type === "symbol" && JSON.stringify((l.layout || {})["icon-image"] || "").includes(ARROW_IMAGE));
 export const rsArrowsOn = () => !_arOff;
 export const rsHasArrows = () => _arLayers().length > 0;
-export function _arApply(){ const v = _arOff ? "none" : "visible"; for(const l of _arLayers()) if(map.getLayoutProperty(l.id, "visibility") !== v) map.setLayoutProperty(l.id, "visibility", v); }
+export function _arApply(){ const v = _arOff ? "none" : "visible"; for(const l of _arLayers()) _roadVis(l.id, v); }     // rsSetRoads(false) keeps them hidden
 export function rsSetArrows(on){ _arOff = !on; try{ localStorage.setItem(_arKey, on ? "1" : "0"); }catch(e){ /* not kept */ } _arApply(); _emit("rs:arrowschange", {on: !!on}); }
 export function addArrow(){
   if(map.hasImage(ARROW_IMAGE)){ if(_arSdf === _tunOn) return; map.removeImage(ARROW_IMAGE); }       // a later style with tunnels (or with none) needs the other kind
