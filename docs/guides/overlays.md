@@ -66,6 +66,25 @@ m.save("site/noise.html")        # writes noise.html and the folder site/rs-file
   overlay only after the overlay showed one time.
 - The page must be tiled (`tiles=True`, the default). An overlay that shows at the start stays in the page.
 
+### Read the data of each overlay only when its files are written
+
+With many large hidden overlays, the page's own data can be larger than the memory. Give `data=` as a function that gives the overlay's data, and `kind=`:
+
+```python
+table = pq.read_table("noise_surface.parquet").sort_by([("DGROUP", "ascending"), ("HEIGHT_M", "ascending")])   # read one time, as Arrow
+def part(a, b):
+    return lambda: gpd.GeoDataFrame.from_arrow(table.slice(a, b - a))      # a GeoDataFrame only while roadstyle writes this overlay
+overlays = [rs.Overlay(part(a, b), kind="fill", color_col="COLOR", label=..., visible=False) for a, b in groups]
+m = rs.duckosm.page(db, overlays=overlays, lazy_overlays=True)
+```
+
+- The page has a small stand-in of each such overlay. Then roadstyle calls the function of one overlay, writes that overlay's tiles and rows, and
+  frees the data before the next overlay. It calls each function one time.
+- The overlay must be hidden at the start (`visible=False`) and have no `edge_col`. Give `kind=`: roadstyle does not read the data before it makes
+  the page. Without `lazy_overlays=True`, a function is an error.
+- Keep the data compact until the function runs: an Arrow table, or a Parquet file with one row group for each overlay (`filters=` then reads only
+  that overlay). A GeoDataFrame of each overlay, made in advance, uses the memory that the function saves.
+
 On noise-map's page (Norrmalm, 89 hidden noise overlays), the HTML file is 16.9 MB in place of 48.5 MB. The first load takes 1.9 s
 in place of 2.9 s, and a switch from one wall height to another takes 0.38 s in place of 0.57 s. At zoom 15, the two heights read
 415 kB of the 33.2 MB of files (Chromium, local server, the median of 3 loads, 2026-11-24).

@@ -23,7 +23,9 @@ class Overlay:
     ----------
     data : a GeoDataFrame / GeoSeries (any CRS; reprojected to EPSG:4326) or a GeoJSON mapping
         (geometry, Feature, or FeatureCollection — assumed lon/lat). Feature ``properties`` are
-        kept and shown in the click popup.
+        kept and shown in the click popup. With ``lazy_overlays=True``, a hidden overlay's data can be a function that gives it
+        (``lambda: gpd.read_parquet(path, filters=[...])``): roadstyle calls it while it writes that overlay's files, and frees the data before
+        the next overlay, so a page of many large overlays does not hold them all. Give ``kind=`` with it.
     kind : ``"fill"`` | ``"line"`` | ``"circle"`` | ``"text"`` — defaults to auto-detect from the geometry (``"text"`` is never detected).
     placement : ``"under"`` (below the roads — e.g. zone fills) or ``"over"`` (on top — e.g. POIs).
     color / opacity : the layer's paint colour and (kind-dependent) default opacity.

@@ -235,6 +235,51 @@ def own_style_names(palette=None, profile=None) -> list[str]:
     return out
 
 
+def _lazy_stand_ins(kwargs, point):
+    """``lazy_overlays=True`` and a hidden rs.Overlay whose ``data`` is a function: the page gets a stand-in of the overlay (one feature at ``point``,
+    a lon/lat on the roads), so that the page has its layers and its own files; ``_lazy_files`` then reads the data and makes the real files, one
+    overlay at a time (docs/design/tiling.md, "Overlays in files"). Gives the keywords with the stand-ins and [(place, overlay)] of the ones to read."""
+    import dataclasses
+
+    from .overlays import Overlay
+    ovs = list(kwargs.get("overlays") or [])
+    lazy = [(i, ov) for i, ov in enumerate(ovs) if isinstance(ov, Overlay) and callable(ov.data)]
+    if not lazy:
+        return kwargs, []
+    if not kwargs.get("lazy_overlays"):
+        raise ValueError("an Overlay whose data is a function needs lazy_overlays=True: roadstyle reads it while it writes the overlay's files")
+    x, y = point
+    shapes = {"fill": {"type": "Polygon", "coordinates": [[[x, y], [x + 1e-4, y], [x + 1e-4, y + 1e-4], [x, y]]]},
+              "line": {"type": "LineString", "coordinates": [[x, y], [x + 1e-4, y]]},
+              "circle": {"type": "Point", "coordinates": [x, y]}, "text": {"type": "Point", "coordinates": [x, y]}}
+    for i, ov in lazy:
+        if ov.visible or ov.edge_col:
+            raise ValueError(f"overlay {ov.label!r}: data as a function is for a hidden overlay (visible=False) with no edge_col")
+        if ov.kind is None:
+            raise ValueError(f"overlay {ov.label!r}: data as a function needs kind= (roadstyle does not read the data before the page is made)")
+        ovs[i] = dataclasses.replace(ov, data={"type": "Feature", "properties": {}, "geometry": shapes[ov.kind]})
+    import uuid
+    return {**kwargs, "overlays": ovs, "files_salt": uuid.uuid4().hex}, lazy
+
+
+def _lazy_files(lk, lazy, sources, files, tile_format=None):
+    """The real files of the overlays of ``_lazy_stand_ins``, in place of their stand-ins' files: for each overlay, its data is read, tiled, written
+    and freed before the next (``overlay_files``). ``sources``: the page's source of each rs.Overlay; ``files``: the page's files (a dict)."""
+    import dataclasses
+    styles = json.loads(lk.part("sections"))["overlays"].get("styles") or {}
+    for i, ov in lazy:
+        src = sources[i]
+        mine = [p for p in files if p.startswith(f"rs-files/{src}-")]
+        if len(mine) != 2:
+            raise ValueError(f"overlay {ov.label!r}: the page has no files of its own for it ({src}); a hidden overlay of a tiled page has them")
+        one = lk.with_arg("overlays", "[" + _overlay_json(dataclasses.replace(ov, data=ov.data()), styles) + "]")
+        archive, rows = rust().overlay_files(one, src, tile_format)
+        del one
+        for p in mine:
+            files[p] = archive if p.endswith(".pmtiles") else rows
+    return files
+
+
 def _overlay_json(ov, styles) -> str:
     """An rs.Overlay (or its data) as the engine reads it, as JSON text: its fields (render_web._styled: a style's fields where the overlay gives
     none), and its data as GeoJSON in ``fc`` (overlays.fc_text: no Python dict of a feature)."""
@@ -417,11 +462,12 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         kwargs = {**kwargs, **level_kw}
     from .render import vehicles_option
     kwargs = vehicles_option(kwargs)
+    kwargs, lazy = _lazy_stand_ins(kwargs, tuple(g.to_crs(4326).geometry.iloc[0].interpolate(0.5, normalized=True).coords[0]) if len(g) else (0.0, 0.0))
     lk, o = _look_and_options({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col,
                                "state": "live"})
-    html, files = rust().page_from(_arrow(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings, lk, o["args"])))
+    html, files, sources = rust().page_from(_arrow(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings, lk, o["args"])))
     _warn()
-    return rw.WebMap(html, files)
+    return rw.WebMap(html, _lazy_files(lk, lazy, sources, dict(files), kwargs.get("tile_format")))
 
 
 def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=None) -> dict:

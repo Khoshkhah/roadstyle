@@ -172,3 +172,61 @@ def test_the_text_of_an_overlay_is_its_geojson():
     z = _zones().to_crs(3006)
     assert json.loads(fc_text(z)) == to_fc(z)
     assert json.loads(fc_text({"type": "Point", "coordinates": [18.0, 59.3]})) == to_fc({"type": "Point", "coordinates": [18.0, 59.3]})
+
+
+def test_an_overlay_whose_data_is_a_function_is_read_while_its_files_are_written(tmp_path):
+    """lazy_overlays=True and rs.Overlay(data=<a function>, visible=False): the page has a stand-in of the overlay; roadstyle calls the function
+    while it writes that overlay's files, one overlay at a time. The files are the overlay's: the same tiles and rows as with the data itself."""
+    import gzip
+    import json
+    calls = []
+
+    def zones():
+        calls.append(1)
+        return _zones()
+    lazy = rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True,
+                               overlays=[rs.Overlay(zones, kind="fill", label="hidden", popup=["zone"], visible=False)])
+    assert calls == [1]                                                  # read once, for its files
+    given = rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True,
+                                overlays=[rs.Overlay(_zones(), kind="fill", label="hidden", popup=["zone"], visible=False)])
+    rows = lambda m: json.loads(gzip.decompress(next(v for k, v in m.files.items() if k.endswith(".json.gz"))))  # noqa: E731
+    def tiles(m):                       # the archive's tiles by z/x/y (its header has the bounds of the overlay alone, and no roads' generation)
+        reader = pytest.importorskip("pmtiles.reader")
+        MemorySource, Reader, all_tiles = reader.MemorySource, reader.Reader, reader.all_tiles
+        return dict(all_tiles(Reader(MemorySource(next(v for k, v in m.files.items() if k.endswith(".pmtiles")))).get_bytes))
+    assert rows(lazy) == rows(given) and len(rows(lazy)) == 3
+    assert tiles(lazy) == tiles(given) and len(tiles(lazy)) > 5
+    path = tmp_path / "f.html"
+    lazy.save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+
+        def serve(route):
+            name = route.request.url.split("//rs.test/", 1)[1]
+            body, r = (tmp_path / name).read_bytes(), route.request.headers.get("range")
+            if r:
+                a, b = map(int, r.removeprefix("bytes=").split("-"))
+                part = body[a:b + 1]
+                route.fulfill(status=206, body=part, headers={"Content-Range": f"bytes {a}-{a + len(part) - 1}/{len(body)}", "Content-Length": str(len(part))})
+            else:
+                route.fulfill(body=body, content_type="text/html" if name.endswith(".html") else "application/gzip")
+        page.route("http://rs.test/**", serve)
+        try:
+            page.goto("http://rs.test/f.html")
+            page.wait_for_function("window.map && window.map.loaded() && map.areTilesLoaded()", timeout=60_000)
+            page.evaluate("rsSetOverlay('hidden', true)")
+            page.wait_for_function("(s => map.querySourceFeatures(s, {sourceLayer: s}).length >= 3)(RS_OVERLAYS.find(o => o.label === 'hidden').source)", timeout=20_000)
+            page.wait_for_function("rsQuery(() => true, 'hidden').length === 3", timeout=20_000)
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_data_as_a_function_needs_lazy_overlays_and_a_kind():
+    with pytest.raises(ValueError, match="needs lazy_overlays=True"):
+        rs.render_dashboard(_edges(), basemap="blank", overlays=[rs.Overlay(_zones, kind="fill", visible=False)])
+    with pytest.raises(ValueError, match="needs kind="):
+        rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True, overlays=[rs.Overlay(_zones, visible=False)])
