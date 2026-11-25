@@ -191,3 +191,12 @@ def test_a_page_makes_the_hover_tooltip_of_an_overlay(tmp_path):
         finally:
             browser.close()
     assert errors == []
+
+def test_the_text_of_an_overlay_is_its_geojson():
+    """overlays.fc_text (the overlay's GeoJSON made as text, with no Python dict of a feature) gives the FeatureCollection of to_fc."""
+    import json
+
+    from roadstyle.overlays import fc_text, to_fc
+    z = _zones().to_crs(3006)
+    assert json.loads(fc_text(z)) == to_fc(z)
+    assert json.loads(fc_text({"type": "Point", "coordinates": [18.0, 59.3]})) == to_fc({"type": "Point", "coordinates": [18.0, 59.3]})
