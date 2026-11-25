@@ -36,3 +36,34 @@ def test_an_overlay_is_a_tile_layer_and_the_dashboard_reads_its_rows(tmp_path):
         finally:
             browser.close()
     assert errors == []
+
+
+def test_a_hidden_overlay_has_its_own_source_and_loads_no_tile_until_it_shows(tmp_path):
+    """An overlay that starts hidden is a vector source of its own with its own archive (docs/design/tiling.md): MapLibre asks for a source's tiles
+    only while one of its layers shows, so a hidden overlay costs a map move nothing. Shown, it draws, and a click selects it. An overlay that
+    shows at the start stays in `roads`."""
+    path = tmp_path / "h.html"
+    rs.render_dashboard(_edges(), basemap="blank", overlays=[rs.Overlay(_zones(), kind="fill", label="zones", popup=["zone"]),
+                                                             rs.Overlay(_zones(), kind="fill", label="hidden", popup=["zone"], visible=False)]).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
+            src = page.evaluate("map.getStyle().sources")
+            assert src["ov1"]["tiles"] == ["pmtiles://ov1/{z}/{x}/{y}"] and "url" not in src["ov1"], src["ov1"]
+            assert page.evaluate("window.__rs_tiles.archives") == ["roads", "ov1"] and "ov0" not in src
+            assert page.evaluate("map.getStyle().layers.filter(l => l['source-layer'] === 'ov1').map(l => l.source)") == ["ov1", "ov1"]
+            assert page.evaluate("map.querySourceFeatures('roads', {sourceLayer: 'ov0'}).length") > 0
+            assert page.evaluate("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length") == 0       # hidden: no tile asked for
+            page.evaluate("document.addEventListener('rs:select', e => { window.__sel = e.detail; })")
+            page.evaluate("rsSetOverlay('zones', false); rsSetOverlay('hidden', true)")
+            page.wait_for_function("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length > 0", timeout=20_000)
+            page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
+            x, y = page.evaluate("(() => { const q = map.project([18.0045, 59.302]); return [q.x, q.y]; })()")
+            page.mouse.click(x, y)
+            page.wait_for_function("window.__sel", timeout=5_000)
+            assert page.evaluate("window.__sel.properties.zone") == "a"
+            assert page.evaluate("map.getFeatureState({source: 'ov1', sourceLayer: 'ov1', id: 2})").get("select") is True
+        finally:
+            browser.close()
+    assert errors == []

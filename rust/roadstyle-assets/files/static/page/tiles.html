@@ -1,17 +1,30 @@
 <script>
 (function(){
-  var b=atob("__RS_PMTILES_B64__"), arr=new Uint8Array(b.length);
-  for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
-  // the archive is one gzip stream (its tiles are not gzipped one by one: the stream is a fifth smaller); a read waits for it
-  var ready=new Response(new Blob([arr]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
-  var src={getKey:function(){return "roads";},
-           getBytes:function(o,l){return ready.then(function(buf){return {data:buf.slice(o,o+l)};});}};
-  var proto=new pmtiles.Protocol(), archive=new pmtiles.PMTiles(src);
-  proto.add(archive);
+  // the archives by source: `roads` and one for each overlay (docs/design/tiling.md). Each is one gzip stream (its tiles are not gzipped one by
+  // one: the stream is a fifth smaller), inflated at its first read: an overlay's archive when the overlay first shows; a read waits for it
+  var all=__RS_PMTILES__, proto=new pmtiles.Protocol(), roads=null;
+  function archive(name){
+    var ready=null;
+    function inflate(){
+      if(!ready){
+        var b=atob(all[name]), arr=new Uint8Array(b.length);
+        for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
+        all[name]=null;
+        ready=new Response(new Blob([arr]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+      }
+      return ready;
+    }
+    var a=new pmtiles.PMTiles({getKey:function(){return name;},
+                               getBytes:function(o,l){return inflate().then(function(buf){return {data:buf.slice(o,o+l)};});}});
+    proto.add(a);
+    return a;
+  }
+  var bytes=all.roads ? Math.floor(all.roads.length*3/4) : 0;
+  Object.keys(all).forEach(function(name){ var a=archive(name); if(name==="roads") roads=a; });
   maplibregl.addProtocol("pmtiles", proto.tile);
-  window.__rs_tiles={ok:true, bytes:arr.length};
+  window.__rs_tiles={ok:true, bytes:bytes, archives:Object.keys(all)};
   // the generation of the road set in the archive's metadata: the dashboard compares it with the style's (generation.js)
-  archive.getMetadata().then(function(m){
+  if(roads) roads.getMetadata().then(function(m){
     window.__rs_tiles.generation=(m && m.generation) || null;
     document.dispatchEvent(new CustomEvent("rs:tiles-generation", {detail: window.__rs_tiles.generation}));
   });

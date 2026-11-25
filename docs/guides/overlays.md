@@ -29,7 +29,7 @@ palette.
 | `label` | the name of the layer in the **Layers** box |
 | `popup` | the fields that show when you click a feature. `None` shows all fields. `[]` makes the layer not clickable. |
 | `tooltip` | the fields that show under the pointer |
-| `visible` | `False` starts the layer switched off |
+| `visible` | `False` starts the layer switched off. An overlay that starts hidden loads no tiles until it shows, so a page can have many of them (one per height or view) and show one at a time with `rs.setOverlay` |
 
 A MapLibre expression in place of a colour (`["get", "colour"]`) is an error: use `color_col`.
 
