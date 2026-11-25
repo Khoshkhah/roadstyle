@@ -418,6 +418,9 @@ fn page_of_json(style: String, page: String, parts: String, pmtiles: Option<Vec<
     roadstyle::page::page_of_json(&style, &page, &parts, pmtiles.as_deref()).map_err(py_err)
 }
 
+/// The files next to a page: (the path relative to the page, the bytes).
+type PageFiles = Vec<(String, Py<pyo3::types::PyBytes>)>;
+
 /// page_from(roads, look, options, given) -> (str, [(path, bytes)]): the page of the roads (an Arrow table) in one call (roadstyle::page_options), as
 /// render_edges(backend="web"). `options`: the look's options (JSON text: palette, profile, settings, features, files), which a view's
 /// palette resolves again; `given`: the caller's values over the look's args (JSON text: basemap and basemaps as resolved entries,
@@ -426,7 +429,7 @@ fn page_of_json(style: String, page: String, parts: String, pmtiles: Option<Vec<
 #[pyfunction]
 #[pyo3(signature = (roads, look, options, given, features=None))]
 fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, options: String, given: String, features: Option<&Bound<'_, PyAny>>)
-             -> PyResult<(String, Vec<(String, Py<pyo3::types::PyBytes>)>)> {
+             -> PyResult<(String, PageFiles)> {
     let options: roadstyle::look::Options = serde_json::from_str(&options).map_err(|e| PyValueError::new_err(format!("options: {e}")))?;
     let given: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&given).map_err(|e| PyValueError::new_err(format!("given: {e}")))?;
     let (look, roads, features) = (&look.0, stream(roads)?, features.map(stream).transpose()?);
