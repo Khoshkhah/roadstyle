@@ -10,7 +10,7 @@ from test_dashboard_sections_browser import _ARGS, _edges  # noqa: E402
 
 import roadstyle as rs  # noqa: E402
 
-_HTML = """<div id="range"></div><div id="week"></div><div id="month"></div><div id="hour"></div><div id="hours"></div><div id="sl"></div><div id="sl2"></div>
+_HTML = """<div id="range"></div><div id="week"></div><div id="month"></div><div id="hour"></div><div id="hours"></div><div id="sl"></div><div id="sl2"></div><div id="sl3"></div>
 <div id="num"></div><div id="col"></div><label class="rs-switch"><input type="checkbox" role="switch" id="sw"><span>Show bridges</span></label>
 <div id="q"></div><div id="drop"></div><div id="prog"></div><button type="button" id="busy">Load</button><button type="button" id="dots">Open</button>
 <nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Fixes<span class="rs-badge">12</span></button><button class="rs-tab" data-tab="b">Tags<span class="rs-unsaved" role="img" aria-label="Not saved"></span></button></nav>
@@ -34,6 +34,7 @@ _SETUP = """() => { window.got = {}; const $ = id => document.getElementById(id)
     hours: rs.hours.use($('hours'), {value: [7, 9], range: true, onChange: log('hours')}),
     sl: rs.slider($('sl'), {label: 'Speed', min: 0, max: 130, step: 10, value: 50, unit: 'km/h', onChange: log('sl')}),
     sl2: rs.slider($('sl2'), {label: 'Flow', min: 0, max: 100, value: [20, 60], onChange: log('sl2')}),
+    sl3: rs.slider($('sl3'), {label: 'Height above the ground', min: 0, max: 8, step: 1, value: 2, format: v => v + ' m', onChange: log('sl3')}),
     num: rs.number($('num'), {label: 'Lanes', min: 1, max: 3, value: 2, onChange: log('num')}),
     col: rs.colorPick($('col'), {label: 'Fill', value: '#0e7f91', palette: ['#0e7f91', '#eb6834', '#2a78d6'], onChange: log('col')}),
     q: rs.search($('q'), {placeholder: 'Find a place', button: 'Go', suggest: t => ['Monaco', 'Monte Carlo', 'Tartu'].filter(n => n.toLowerCase().startsWith(t.toLowerCase())).map(n => ({label: n, sub: 'x', value: n})),
@@ -144,6 +145,28 @@ def test_the_slider_the_number_and_the_colour(page):
     page.keyboard.press("Escape")                                        # back to the colour before the box opened
     assert page.locator(".rs-cp-box").count() == 0 and page.evaluate("P.col.value()") == "#123456"
     assert page.evaluate("document.activeElement.classList.contains('rs-color-btn')")
+
+
+def test_a_slider_works_with_a_click_a_tick_and_the_keys(page):
+    """A click on the track goes to the nearest step, a click on a tick selects it, and each key moves it: one onChange each."""
+    assert page.locator("#sl .rs-slider-tick").count() == 0                # 13 steps: no ticks
+    assert page.locator("#sl3 .rs-slider-tick").all_inner_texts() == [f"{v} m" for v in range(9)]
+    box = page.locator("#sl3 .rs-slider-track").bounding_box()
+    page.mouse.click(box["x"] + 9 + (box["width"] - 18) * 0.7, box["y"] + box["height"] / 2)   # 5.6: step 6
+    assert page.evaluate("P.sl3.value()") == 6 and _got(page, "sl3") == [6]
+    assert page.inner_text("#sl3 .rs-slider-v") == "6 m" and page.inner_text("#sl3 .rs-slider-tick.on") == "6 m"
+    page.click("#sl3 .rs-slider-tick[data-v='3']")
+    assert page.evaluate("P.sl3.value()") == 3 and _got(page, "sl3") == [6, 3]
+    page.click("#sl3 .rs-slider-tick[data-v='3']")                          # the same value: no onChange
+    page.keyboard.press("End")
+    page.keyboard.press("ArrowLeft")
+    page.keyboard.press("Home")
+    assert _got(page, "sl3") == [6, 3, 8, 7, 0]
+    b2 = page.locator("#sl2 .rs-slider-track").bounding_box()            # two handles (20, 60): a click at 30 moves the nearest one
+    page.mouse.click(b2["x"] + 9 + (b2["width"] - 18) * 0.3, b2["y"] + b2["height"] / 2)
+    assert page.evaluate("P.sl2.value()") == [30, 60] and _got(page, "sl2")[-1] == [30, 60]
+    page.evaluate("const d = document.createElement('div'); document.getElementById('sl3').after(d); rs.slider(d, {min: 0, max: 8, ticks: false}); window._d = d")
+    assert page.evaluate("_d.querySelectorAll('.rs-slider-tick').length") == 0
 
 
 def test_the_switch_and_the_search(page):
@@ -363,9 +386,15 @@ def test_the_parts_fit_a_phone(page_path):
           const small = [...document.querySelectorAll('#range .rs-day-field, #hour .rs-hours-field, #hours .rs-hours-field, #hour .rs-day-step, #num .rs-num-box, #col .rs-color-btn, #q .rs-search-box, #tools button, .rs-more-btn')]
             .filter(e => e.getBoundingClientRect().height < 40).map(e => e.className + ' ' + Math.round(e.getBoundingClientRect().height));
           return {wide, small, page: document.documentElement.scrollWidth - innerWidth}; }""")
+        ticks = pg.evaluate("[...document.querySelectorAll('#sl3 .rs-slider-tick')].map(t => t.getBoundingClientRect()).map(r => [r.left, r.right, r.height])")
+        right = pg.evaluate("document.querySelector('#sb .sb-body').getBoundingClientRect().right")
+        pg.locator("#sl3 .rs-slider-tick[data-v='5']").tap()
+        tapped = pg.evaluate("P.sl3.value()")
         pg.evaluate("rs.toast('On a phone.')")
         top = pg.evaluate("document.querySelector('#rs-toasts').getBoundingClientRect().top")
         browser.close()
     assert errors == []
     assert out["wide"] == [] and out["small"] == [] and out["page"] <= 0, out
     assert top < 100                                                     # a toast is at the top of a phone: the sheet is at the bottom
+    assert all(r[1] <= right + 0.5 and r[2] >= 24 for r in ticks) and all(a[1] <= b[0] for a, b in zip(ticks, ticks[1:], strict=False)), ticks   # inside, not on each other
+    assert tapped == 5

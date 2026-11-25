@@ -1,6 +1,7 @@
 // The value fields of a page (docs/design/dashboard_parts_2.md): a slider (one value, or a range with two handles), a number field with -/+ and a
 // colour picker. The page gives an empty element; each gives back {value(), set(v, quiet)}. `onChange(v)` comes when a value is set (at the release
-// of a slider); a slider's `onInput(v)` comes while it moves.
+// of a slider, at a click on its track or a tick, at each arrow key, Home or End); a slider's `onInput(v)` comes while it moves. A slider with 12
+// steps or fewer has a tick with its `format` label under the track at each step (`ticks: false`: none).
 //   rs.slider(el, {label: "Speed", min: 0, max: 130, step: 10, value: 50, unit: "km/h", onChange})
 //   rs.slider(el, {label: "Hours", min: 0, max: 23, value: [7, 9], format: v => v + ":00"})
 //   rs.number(el, {label: "Lanes", min: 1, max: 8, value: 2})
@@ -15,7 +16,8 @@ export function rsSlider(el, opts = {}){
   const two = Array.isArray(opts.value), min = opts.min ?? 0, max = opts.max ?? 100, step = opts.step ?? 1;
   const fmt = opts.format || (v => v + (opts.unit ? " " + opts.unit : ""));
   el.classList.add("rs-slider"); el.classList.toggle("rs-slider-two", two);
-  el.innerHTML = _fdHead("rs-slider") + '<div class="rs-slider-track"><div class="rs-slider-fill"></div></div>';
+  const n = Math.round((max - min) / step), ticks = opts.ticks !== false && n > 0 && n <= 12;
+  el.innerHTML = _fdHead("rs-slider") + '<div class="rs-slider-track"><div class="rs-slider-fill"></div></div>' + (ticks ? '<div class="rs-slider-ticks"></div>' : "");
   el.querySelector(".rs-slider-l").textContent = opts.label || "";
   const track = el.querySelector(".rs-slider-track"), fill = el.querySelector(".rs-slider-fill"), out = el.querySelector(".rs-slider-v");
   const ins = (two ? ["From", "To"] : [opts.label || "Value"]).map(name => {
@@ -23,11 +25,41 @@ export function rsSlider(el, opts = {}){
     track.appendChild(i); return i;
   });
   const val = () => two ? ins.map(i => +i.value) : +ins[0].value;
+  // the place of a value on the track: the centre of the thumb, which stays half a thumb (--rs-thumb, dashboard.css) inside each end
+  const at = v => "calc(var(--rs-thumb) / 2 + " + (v - min) / (max - min || 1) + " * (100% - var(--rs-thumb)))";
+  if(ticks) for(let k = 0; k <= n; k++){
+    const v = +(min + k * step).toFixed(10), t = document.createElement("span");
+    t.className = "rs-slider-tick"; t.dataset.v = v; t.textContent = fmt(v); t.style.left = at(v);
+    el.querySelector(".rs-slider-ticks").appendChild(t);
+  }
+  // labels that do not fit side by side: only every k-th label shows (the marks stay, and a click on one still selects it)
+  const tickBox = el.querySelector(".rs-slider-ticks");
+  if(tickBox) new ResizeObserver(() => {
+    const ts = [...tickBox.children], th = parseFloat(getComputedStyle(el).getPropertyValue("--rs-thumb")) || 18;
+    if(!tickBox.clientWidth) return;
+    const k = Math.max(1, Math.ceil((Math.max(...ts.map(t => t.offsetWidth)) + 4) / ((tickBox.clientWidth - th) / n)));
+    ts.forEach((t, i) => t.classList.toggle("rs-slider-tick-q", i % k !== 0));
+  }).observe(tickBox);
+  // a click (or a tap) on the track or on a tick: the nearest step, to the nearest handle; one onChange
+  function pick(v){
+    v = Math.max(min, Math.min(max, +(min + Math.round((v - min) / step) * step).toFixed(10)));
+    const k = two ? (Math.abs(v - ins[0].value) <= Math.abs(v - ins[1].value) ? 0 : 1) : 0;
+    ins[k].focus();
+    if(+ins[k].value === v) return;
+    ins[k].value = v; paint(); opts.onInput?.(val()); opts.onChange?.(val());
+  }
+  track.addEventListener("click", e => {
+    if(e.target.tagName === "INPUT") return;                                   // the thumb: the input's own events
+    const r = track.getBoundingClientRect(), th = parseFloat(getComputedStyle(el).getPropertyValue("--rs-thumb")) || 18;
+    pick(min + (e.clientX - r.left - th / 2) / Math.max(1, r.width - th) * (max - min));
+  });
+  el.querySelector(".rs-slider-ticks")?.addEventListener("click", e => { const t = e.target.closest(".rs-slider-tick"); if(t) pick(+t.dataset.v); });
   function paint(){
     const pc = v => (v - min) / (max - min || 1) * 100, v = val();
     if(two){ fill.style.left = pc(v[0]) + "%"; fill.style.width = pc(v[1]) - pc(v[0]) + "%"; out.textContent = fmt(v[0]) + " – " + fmt(v[1]); }
     else{ fill.style.left = "0"; fill.style.width = pc(v) + "%"; out.textContent = fmt(v); }
     ins.forEach(i => i.setAttribute("aria-valuetext", fmt(+i.value)));
+    el.querySelectorAll(".rs-slider-tick").forEach(t => t.classList.toggle("on", (two ? v : [v]).includes(+t.dataset.v)));
   }
   ins.forEach((i, k) => {
     i.addEventListener("input", () => {

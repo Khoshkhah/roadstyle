@@ -689,11 +689,16 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
     rs.slider(document.getElementById("speed"), {label: "Speed limit", min: 0, max: 130, step: 10, value: 50, unit: "km/h",
                                                    onInput: v => preview(v), onChange: v => apply(v)});
     rs.slider(document.getElementById("flow"), {label: "Flow", min: 0, max: 2000, step: 50, value: [300, 1200], unit: "veh/h"});   // two handles
+    rs.slider(document.getElementById("height"), {label: "Height above the ground", min: 0, max: 8, step: 1, value: 4,
+                                                   format: v => v + " m", onChange: v => showHeight(v)});   // 8 steps: a tick at each step
     ```
 
 ??? info "Details"
 
-    - The value is at the right of the label. `onInput` comes while the handle moves, `onChange` at the release. With `value: [a, b]` the slider has two handles, and they do not cross. `format(v)` gives the text of a value (default: the value and the unit). It is the browser's range input, so the arrow keys, Home and End work. It gives `{value(), set(v, quiet)}`.
+    - The value is at the right of the label. `onInput` comes while the handle moves, `onChange` at the release. With `value: [a, b]` the slider has two handles, and they do not cross. `format(v)` gives the text of a value (default: the value and the unit). It gives `{value(), set(v, quiet)}`.
+    - Click or tap the track: the handle goes to the nearest step, and `onChange` comes one time. With two handles, the nearest handle moves.
+    - A slider with 12 steps or fewer shows a tick at each step, with its `format` text under the track. Click a tick or its text to select that value. To show no ticks, give `ticks: false`.
+    - Keys: the arrow keys move one step, Home and End go to the ends. Each key sends `onChange`.
 
 ### A number field { .rs-part }
 

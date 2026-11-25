@@ -51,3 +51,37 @@ def test_the_page_has_one_object_for_its_state(tmp_path):
     assert {"roadFill": False} in seen and {"colorBy": "lanes"} in seen
     assert link.startswith("#rs=") and can == [True, False, False]
     assert again["roadFill"] is False and again["colorBy"] == "lanes" and again["selection"] == primary[0]
+
+
+def test_the_roads_go_and_the_street_names_stay(tmp_path):
+    """rsSetRoads(false, {labels: true}): every road layer has the filter false, except roads-labels; the state, the event and setState."""
+    import roadstyle as rs
+    from roadstyle import _engine
+    if not _engine.available():
+        pytest.skip("the Rust extension is not built")
+    path = tmp_path / "roads.html"
+    rs.render_edges(_edges(), basemap="blank", labels=True).save(path)
+    off = """() => map.getStyle().layers.filter(l => /roads-/.test(l.id) && JSON.stringify(map.getFilter(l.id)) === "false").map(l => l.id)"""
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded() && window.rs", timeout=30_000)
+        layers = page.evaluate("map.getStyle().layers.map(l => l.id).filter(id => /roads-/.test(id))")
+        page.evaluate("window.ev = []; document.addEventListener('rs:roadschange', e => ev.push(e.detail)); rsSetRoads(false, {labels: true})")
+        hidden = page.evaluate(off)
+        state = page.evaluate("rs.getState().roads")
+        page.evaluate("rsSetRoads(false)")
+        all_off = page.evaluate(off)
+        page.evaluate("rs.setState({roads: {on: true}})")
+        back = page.evaluate(off)
+        ev = page.evaluate("ev")
+        browser.close()
+    assert errors == []
+    assert "roads-labels" in layers and "roads-simple" in layers, layers
+    assert "roads-labels" not in hidden and "roads-simple" in hidden and "roads-arrows" in hidden, hidden
+    assert state == {"on": False, "labels": True}
+    assert "roads-labels" in all_off and back == []
+    assert ev == [{"on": False, "labels": True}, {"on": False, "labels": False}, {"on": True, "labels": False}]

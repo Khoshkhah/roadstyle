@@ -12,7 +12,7 @@ with the controls hidden. How to use them together: [Dashboards](../guides/dashb
 
 ```js
 {v: 1, selection, highlight, colorBy, colors, filter: {classes, bridges, tunnels, access, ids}, fade, overlays: {label: {visible}},
- roadFill, tunnel, palette, view, basemap, view3d, camera: {center, zoom, pitch, bearing}, streetView: {mode}, google3d, panel}
+ roadFill, roads: {on, labels}, tunnel, palette, view, basemap, view3d, camera: {center, zoom, pitch, bearing}, streetView: {mode}, google3d, panel}
 ```
 
 | method | does |
@@ -21,7 +21,7 @@ with the controls hidden. How to use them together: [Dashboards](../guides/dashb
 | `rs.setState(part)` | applies a part of the state through the controls' functions (a saved view, a URL) |
 | `rs.can(part)` | false for a part that this page cannot apply (an unknown key, a colour option the style does not have) |
 | `rs.link()` | the part that differs from the start, as `#rs=` and base64url JSON; a page opened with it applies it |
-| `rs.on(event, fn)` | `event`: `state` (each change, as the part of the state that changed), or `select`, `deselect`, `filter`, `color`, `overlay`, `tunnel`, `view`, `view3d`, `basemap`, `highlight`, `roadfill`, `fade`, `streetview`, `google3d`, `data`, `tool` (the `rs:*` event's `detail`); returns the function that removes it |
+| `rs.on(event, fn)` | `event`: `state` (each change, as the part of the state that changed), or `select`, `deselect`, `filter`, `color`, `overlay`, `tunnel`, `view`, `view3d`, `basemap`, `highlight`, `roadfill`, `roads`, `fade`, `streetview`, `google3d`, `data`, `tool` (the `rs:*` event's `detail`); returns the function that removes it |
 | `rs.select(id)`, `rs.highlight(ids, set?)`, `rs.focus(ids)` | as `rsSelect`, `rsHighlight`, `rsFocus`, with edge ids (`null`: deselect). `rs.highlight(ids, {set, color, opacity})` lights a named set in its own colour, as `rsHighlight` does. `rs.focus` fits the roads above the bottom dock where the dock covers the map |
 | `rs.request.tile(source, z, x, y)`, `.rows(source, ids)`, `.row(source, id)`, `.query(sql, {signal})`, `.schema()`, `.frames(from, to)`, `.lines(ids)` | the four requests of the dashboard (`dashboard/adapter.js`): each one calls the page's **adapter** and throws an `Error` that says so when the page has none, or its adapter lacks that function ([the design](../design/memory_budget.md)) | |
 | `rs.setAdapter(adapter)` | set the adapter of the page, an object with the optional functions `tile(source, z, x, y)`, `rows(source, ids)`, `lines(ids)`, `query(sql, {signal})`, `schema()`, `frames(from, to)` and `style()`; null removes it. The option `adapter` of `rsDashboard` does the same at the start. A road that the road table has not got (a page with no table: way D) is asked from `rows`: a selection and a hover tooltip wait for it, and all the rows that ask in one turn go in one request. `dataDock` takes its `query` and `schema` from the adapter when the host gives none | |
@@ -144,6 +144,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsSetTunnelStyle({strength, palette, ratio, toward})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]`, `toward` a name of `RS_TUNNEL_TOWARDS` or a `#rrggbb` (any may be left out; another `toward` throws) | `rs:tunnelchange` |
 | `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |
 | `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays. Every road piece is in the road layer `roads-simple` (source `simple`) and its dash layer `roads-simple-dash`; this function, `rsColor` and `rsSetColorField` set it too | `rs:roadfillchange` |
+| `rsSetRoads(on, {labels})` | show / hide the drawing of every road: the fill, the casing, the dashes, the arrows, the bridges and the tunnels. With `{labels: true}`, the street names (the layer `roads-labels`) stay. The overlays stay. A hidden road gets no click and no hover. Use it to show the data of an overlay under the street names. State: `roads: {on, labels}` (`rs.setState({roads: {on: false, labels: true}})`) | `rs:roadschange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
 | `rsSetTheme("light" \| "dark")` | switch the page theme (a base map with a dark twin follows it) | `rs:themechange` |
 | `rsOpenSettings()` | open the settings box | |
@@ -190,6 +191,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio`, `toward` |
 | `rs:viewselect` | `rsSetView` | `view` (name), `index` |
 | `rs:roadfillchange` | `rsSetRoadFill` | `road_fill` |
+| `rs:roadschange` | `rsSetRoads` | `on`, `labels` |
 | `rs:streetviewchange` | `rsSetStreetView` | `open` |
 | `rs:google3dchange` | `rsSetGoogle3D` | `open` |
 | `rs:streetviewmove` | `rsStreetViewStep` | `id`, `streetView`, `atStart`, `atEnd` |

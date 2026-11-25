@@ -116,6 +116,8 @@ export interface DashboardState {
   filter: { classes: string[] | null; bridges: boolean; tunnels: boolean; access: string[]; ids: EdgeId[] | null };
   overlays: Record<string, { visible: boolean; colorBy?: string }>;
   roadFill: boolean;
+  /** rsSetRoads: the drawing of the roads; labels: the street names stay while the roads are off. */
+  roads: { on: boolean; labels: boolean };
   tunnel: { strength: number; toward: string; palette: string; ratio: [number, number] } | null;
   palette: string | null;
   view: string | null;
@@ -128,7 +130,7 @@ export interface DashboardState {
 }
 
 export type DashboardEvent = "state" | "select" | "deselect" | "filter" | "color" | "overlay" | "tunnel" | "view" | "view3d"
-  | "basemap" | "highlight" | "roadfill" | "streetview" | "google3d" | "data" | "tool";
+  | "basemap" | "highlight" | "roadfill" | "streetview" | "google3d" | "data" | "tool" | "roads";
 
 /** One tool of the toolbox (docs/design/dashboard_templates.md, 3.2). */
 export interface ToolInfo { id: string; kind: "button" | "toggle" | "box" | "window"; title: string; open: boolean | null; }

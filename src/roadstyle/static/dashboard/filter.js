@@ -12,6 +12,8 @@ let ACCESS = [];   // access_col: [[kind, colour, label, count], ...] for the ki
 const _accHid = new Set();            // the access kinds switched off (rsSetAccess)
 let _bridgesOn=true;   // rsSetBridges: hide every elevated (lvl>0) road and its 3D deck ribbons
 let _tunnelsOn=true;   // rsSetTunnels: hide every below-ground (lvl<0) road, its names and arrows
+let _roads={on:true, labels:false};   // rsSetRoads: hide the drawing of every road (fill, casing, dashes, arrows, bridges, tunnels); labels: the names stay
+const _isLabels=id=>/roads-labels/.test(id);
 const _ovIds={};       // an overlay's own rsFilter(ids, label) id set, by label (an attached one: composed with its edges' filter below)
 const _ovKinds={};     // rsSetKinds: the kinds of a base-map layer that show, by label (null: all)
 const _ovBase={};      // a not attached overlay layer's own filter, by layer id (read once)
@@ -35,7 +37,7 @@ export function _roadTest(){
 export function _applyRoadFilters(){
   const {hidden, q, edgeOn} = _roadTest();
   const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
-  ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
+  ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn || !_roads.on ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
     ? _sfeats((_src(src)||{}).source).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
   _bmFilter(multi.decks);   // the sloped mesh of the 3D decks shows the same features as their pick layers
   const and = (f,c)=>f?["all",f,c]:c;
@@ -60,6 +62,7 @@ export function _applyRoadFilters(){
       if(!_tunnelsOn) f=and(f, [">=",["coalesce",["get",lvl],0],0]);
       if(q) f=and(f, kind==="roads" ? qr : qe);
       if(ov && _ovIds[ov.label]) f=and(f, _has(["id"],_ovIds[ov.label]));
+      if(!_roads.on && !ov && !(_roads.labels && _isLabels(l.id))) f=false;
     }
     // validate:false: our own filters need no grammar check, which cost ~6 ms a layer (a mode or class switch on a page of ~500 layers froze it ~3 s)
     try{ map.setFilter(l.id,f,{validate:false}); }catch(e){}
@@ -78,6 +81,12 @@ export function rsSetBridges(on){
 export function rsSetTunnels(on){
   _tunnelsOn=!!on; _applyRoadFilters();
   _emit("rs:filterchange", {tunnels:_tunnelsOn});
+}
+// rsSetRoads(on, {labels}): hide or show the drawing of every road; {labels: true} keeps the street names (the layer roads-labels). The
+// overlays attached to edges stay. A hidden road has no click and no hover.
+export function rsSetRoads(on, o){
+  _roads={on:!!on, labels:!!(o && o.labels)}; _applyRoadFilters();
+  _emit("rs:roadschange", {..._roads});
 }
 // rsFade(rows, {opacity}): every road that is not in the set is drawn at `opacity` (default 0.18) of its own opacity, with its arrows and names; the
 // pair drawn as one line follows either edge, as in rsFilter. rsFade(null) ends it. Each value of a zoom curve is multiplied, so the curve stays.
@@ -166,12 +175,13 @@ export function useFilter(){
   for(const k in _fltBase) delete _fltBase[k];
   for(const k in _ovBase) delete _ovBase[k];
   if(_modes) rsSetModes(_modes);                              // the new road table's rows
-  else if(_fltVis || _qIds || !_bridgesOn || !_tunnelsOn || _accHid.size) _applyRoadFilters();
+  else if(_fltVis || _qIds || !_bridgesOn || !_tunnelsOn || !_roads.on || _accHid.size) _applyRoadFilters();
   OVERLAYS.filter(ov=>!ov.base && (_ovIds[ov.label] || _ovKinds[ov.label])).forEach(_ovApply);
 }
 export function initFilter(){
   map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
   window.rsSetClasses = rsSetClasses;
+  window.rsSetRoads = rsSetRoads;
   window.rsSetAccess = rsSetAccess;
   window.rsSetBridges = rsSetBridges;
   window.rsSetTunnels = rsSetTunnels;

@@ -21,7 +21,7 @@ _PARTS = """<nav class="rs-tabs" id="tb"><button class="rs-tab on" data-tab="a">
 <p><button>Plain</button> <button class="sb-primary">Primary</button> <input placeholder="A text box"></p>
 <p class="sb-note">Small print</p><a href="#">a link</a> <span class="rs-chip">chip</span> <span class="rs-chip accent">accent</span> <span class="rs-chip err">err</span> <span class="rs-chip warn">warn</span> <span class="rs-chip ok">ok</span>
 <p>Heads <button class="rs-link">default</button> <input type="range" min="0" max="10" value="4"> <input type="color" value="#b8d986"></p>
-<div id="p2-num2"></div><div id="p2-q2"></div><div class="rs-status" id="p2-empty"></div><div id="p2-range"></div><div id="p2-hour"></div><div id="p2-hours"></div><div id="p2-sl"></div><div id="p2-num"></div><div id="p2-col"></div>
+<div id="p2-num2"></div><div id="p2-q2"></div><div class="rs-status" id="p2-empty"></div><div id="p2-range"></div><div id="p2-hour"></div><div id="p2-hours"></div><div id="p2-sl"></div><div id="p2-sl3"></div><div id="p2-num"></div><div id="p2-col"></div>
 <label class="rs-switch"><input type="checkbox" role="switch" checked><span>Show bridges</span></label><div id="p2-q"></div><div id="p2-drop"></div><div id="p2-prog"></div>
 <div class="rs-status warn">3 fixes are not saved.</div><div class="rs-status error">Not an OSM file.</div><div class="rs-status ok">Done.</div>
 <p><button>Fixes<span class="rs-badge">12</span></button> <button class="sb-primary">Save<span class="rs-badge">3</span></button> <button class="sb-danger">Delete</button>
@@ -44,7 +44,7 @@ _SCRIPT = """rs.ready(() => {
   rs.legend.add({id: "ev", color: "#ff0066", label: "Events"});
   const $ = id => document.getElementById(id);
   rs.days.range($("p2-range"), {min: "2026-09-01", max: "2026-11-06"}); rs.hours.use($("p2-hour"), {value: 8, hours: [6, 7, 8, 10]}); rs.hours.use($("p2-hours"), {value: [7, 9], range: true});
-  rs.slider($("p2-sl"), {label: "Speed", min: 0, max: 130, value: 50, unit: "km/h"}); rs.number($("p2-num"), {label: "Lanes", min: 1, max: 8, value: 2, unit: "lanes"});
+  rs.slider($("p2-sl"), {label: "Speed", min: 0, max: 130, value: 50, unit: "km/h"}); rs.slider($("p2-sl3"), {label: "Height", min: 0, max: 8, value: 3, format: v => v + " m"}); rs.number($("p2-num"), {label: "Lanes", min: 1, max: 8, value: 2, unit: "lanes"});
   rs.colorPick($("p2-col"), {label: "Fill"}); rs.search($("p2-q"), {button: "Go", suggest: () => [{label: "Monaco", sub: "Monaco"}, {label: "Monte Carlo", sub: "Monaco"}]}).set("Mo");
   rs.number($("p2-num2"), {label: "Buffer", min: 0, max: 500, step: 50, value: 100, unit: "m", snap: false, disabled: true});
   const here = document.createElement("button"); here.type = "button"; here.setAttribute("aria-label", "What is here?"); here.textContent = "?"; rs.toggle(here, () => {}).set(true, true);

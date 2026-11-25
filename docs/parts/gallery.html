@@ -296,9 +296,10 @@ const PARTS = [
     rs.hours.use(document.getElementById("gl-hours"), {value: [7, 9], range: true, label: "Rush hours", onChange: v => out("hours-out", `onChange: <b>[${v}]</b>`)});
   }},
   {id: "slider", name: "Slider", make(){
-    rs.sections.add({id: "slider", html: '<div id="gl-sl"></div><div id="gl-sl2" style="margin-top:12px"></div>'});
+    rs.sections.add({id: "slider", html: '<div id="gl-sl"></div><div id="gl-sl2" style="margin-top:12px"></div><div id="gl-sl3" style="margin-top:12px"></div>'});
     rs.slider(document.getElementById("gl-sl"), {label: "Speed limit", min: 0, max: 130, step: 10, value: 50, unit: "km/h"});
     rs.slider(document.getElementById("gl-sl2"), {label: "Flow", min: 0, max: 2000, step: 50, value: [300, 1200], unit: "veh/h"});
+    rs.slider(document.getElementById("gl-sl3"), {label: "Height above the ground", min: 0, max: 8, step: 1, value: 4, format: v => v + " m"});   // 8 steps: ticks
   }},
   {id: "number", name: "Number field", make(){
     rs.sections.add({id: "number", html: '<div class="gl-row"><div id="gl-num"></div><div id="gl-num2"></div></div><div class="gl-row" style="margin-top:12px"><div id="gl-num3"></div><div id="gl-num4"></div></div>'});
