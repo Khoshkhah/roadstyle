@@ -94,6 +94,9 @@ pub struct PageOptions {
     pub color_active: Value,
     pub overlays: Value,
     pub overlay_control: bool,
+    /// the label of the base-map box's one switch of the base map's layers (the page's default: "Map layers")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overlays_label: Option<String>,
     pub overlay_popup: bool,
     pub tunnel: Value,
     pub fill_layers: Value,

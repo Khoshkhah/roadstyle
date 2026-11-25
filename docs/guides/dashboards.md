@@ -149,6 +149,8 @@ Each item below has the same form: a picture or a live page when there is one, a
     - The layers of the file's base map (land, water, buildings, ...) show over a blank base map. When the person chooses a base map with tiles or a
       style in the switcher (OpenFreeMap, OSM, the satellite), that base map replaces them: they are off while it shows, and come back with a blank base
       map. Your overlays (`rs.Overlay`) stay over every base map.
+    - The one switch "Base map layers" of the base-map box turns the file's base-map layers on and off, not your overlays. To give a group
+      of your overlays a switch, add a row: `rsAddTopRow({id: "noise", label: "Noise", get: () => on, set: v => { on = v; ... }})`.
     - `dashboard=True` is the docked dashboard of roadstyle with the colour option "Modes". `dashboard=False` (the default) has no panel.
 
 ## Options { .rs-group }

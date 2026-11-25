@@ -46,7 +46,7 @@ export function makeApi(extra){
   const rows = ids => ids == null ? null : Array.from(ids, row);
   const state = {v: 1, selection: null, highlight: [], colorBy: ((O.color_options || [])[O.color_active] || {}).name || null, colors: [],
                  filter: {classes: null, bridges: true, tunnels: true, access: [], ids: null}, fade: null, overlays: {},
-                 roadFill: !O.road_fill || O.road_fill.on !== false, tunnel: null, palette: null, view: null,
+                 roadFill: !O.road_fill || O.road_fill.on !== false, roads: {on: true, labels: true}, tunnel: null, palette: null, view: null,
                  basemap: ((O.basemaps || [])[0] || {}).key || null, view3d: false, streetView: {mode: "off"}, google3d: false, panel: null};
   // the parts of the state that a style gives: at the start, and again for a new style (refreshState)
   const fromStyle = () => {
@@ -82,6 +82,7 @@ export function makeApi(extra){
   });
   track("rs:overlaychange", d => { state.overlays[d.overlay] = {...(state.overlays[d.overlay] || {}), visible: !!d.visible}; return {overlays: state.overlays}; });
   track("rs:roadfillchange", d => ({roadFill: state.roadFill = !!d.road_fill}));
+  track("rs:roadschange", d => ({roads: state.roads = {on: !!d.on, labels: !!d.labels}}));
   track("rs:tunnelchange", d => ({tunnel: state.tunnel = {strength: d.strength, toward: d.toward, palette: d.palette, ratio: d.ratio}}));
   track("rs:viewselect", d => ({view: state.view = d.view}));
   track("rs:basemapchange", d => ({basemap: state.basemap = d.basemap}));
@@ -90,7 +91,7 @@ export function makeApi(extra){
   track("rs:google3dchange", d => ({google3d: state.google3d = !!d.open}));
   const call = (name, ...a) => { if(typeof window[name] === "function") return window[name](...a); };
   const camera = () => { if(!map) return null; const c = map.getCenter(); return {center: [c.lng, c.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing()}; };
-  const KEYS = ["selection", "highlight", "colorBy", "colors", "filter", "fade", "overlays", "roadFill", "tunnel", "view", "basemap", "view3d", "camera",
+  const KEYS = ["selection", "highlight", "colorBy", "colors", "filter", "fade", "overlays", "roadFill", "roads", "tunnel", "view", "basemap", "view3d", "camera",
                 "streetView", "google3d", "panel"];
   const api = {
     tools: rsTools,              // the toolbox: add, bind, remove, open, close, list (tools.js)
@@ -161,6 +162,7 @@ export function makeApi(extra){
       if("fade" in c) api.fade(c.fade);
       if("overlays" in c) Object.entries(c.overlays || {}).forEach(([n, o]) => api.setOverlay(n, o.visible));
       if("roadFill" in c) call("rsSetRoadFill", !!c.roadFill);
+      if("roads" in c && c.roads) call("rsSetRoads", c.roads.on !== false, {labels: c.roads.labels !== false});
       if("tunnel" in c && c.tunnel) api.setTunnelStyle(c.tunnel);
       if("view3d" in c) call("rsSetView3D", !!c.view3d);
       if("streetView" in c) call("rsSetStreetView", !!c.streetView && c.streetView.mode !== "off");

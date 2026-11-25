@@ -133,13 +133,16 @@ let _ovBox = null, _ovGroupOff = false;
 // A page with a toolbar has no Layers box: one switch for all the layers is in the base-map box (basemapbox.js), and the legend box lists them
 // (colorbox.js). A page with no base-map box keeps the Layers box.
 const _ovInToolbox = () => !!(O.dashboard && O.dashboard.toolbar && getTool("basemap"));
-// rsSetOverlays(on): every layer of the style together. On: each layer as the style starts it (the points of a base map start off); off: all of them hidden
+// rsSetOverlays(on): the layers of the base map together (the base-map box's one switch, O.overlays_label). On: each layer as the style starts it (the points of
+// a base map start off); off: all of them hidden. A page's own overlays (rs.Overlay) are not in the group: a page switches them itself (rsSetOverlay, a row
+// of its own: rsAddTopRow). A page with no base-map layer has its own overlays as the group.
+export const _ovGroup = () => OVERLAYS.some(o => o.base_map) ? OVERLAYS.filter(o => o.base_map) : OVERLAYS;
 export function rsSetOverlays(on){
   _ovGroupOff = !on;
-  OVERLAYS.forEach(ov=>rsSetOverlay(ov.label, on ? ov.visible0 : false));
+  _ovGroup().forEach(ov=>rsSetOverlay(ov.label, on ? ov.visible0 : false));
   _emit("rs:overlayschange", {visible: !!on});
 }
-export const rsGetOverlays = () => OVERLAYS.length > 0 && !_ovGroupOff;
+export const rsGetOverlays = () => _ovGroup().length > 0 && !_ovGroupOff;
 function _ovBoxRows(){
   if(_ovBox){ _ovBox.remove(); _ovBox = null; }
   for(const k of Object.keys(_ovCbs)){ _ovCbs[k].closest("label")?.remove(); delete _ovCbs[k]; }
@@ -166,7 +169,7 @@ export function useOverlays(){
   _OV_POPUP = O.overlay_popup;
   clearOvSel(); _ovHov = null; _ovUnder = null;
   if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
-  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); ov.layers.forEach(_ovBind); if(_ovGroupOff || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
+  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); ov.layers.forEach(_ovBind); if((_ovGroupOff && _ovGroup().includes(ov)) || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
   window.RS_OVERLAYS = OVERLAYS;
   if(_ovMapOn === null) _ovMapOn = _bmOwnMap((O.basemaps || [])[0]);        // the base map of the start
   if(!_ovMapOn) _ovOwnMap(false);
