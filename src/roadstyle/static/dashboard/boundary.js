@@ -4,9 +4,10 @@
 import {map, O, RS_LOADED, _src} from "./core.js";
 
 const _bdWorld = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
-// the outer rings of the polygons of the style's boundary source, and every coordinate of it
+// the outer rings of the polygons of the style's boundary source, and every coordinate of it. A tiled page has the boundary in its tiles, with no
+// GeoJSON: the page gives the shape (O.boundary_shape)
 function _bdShape(){
-  const role = _src("boundary"), src = role && map.getSource(role.source), fc = src && src.serialize().data;
+  const role = _src("boundary"), src = role && map.getSource(role.source), fc = (src && src.type === "geojson" && src.serialize().data) || O.boundary_shape;
   if(!fc || !fc.features) return null;
   const rings = [], all = [];
   const walk = c => Array.isArray(c[0]) ? c.forEach(walk) : all.push(c);
