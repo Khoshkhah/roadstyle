@@ -228,10 +228,38 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 
 ??? info "Details"
 
+    - A tab is a text label, not a button. The selected tab has the accent color and a line under it. A thin line is under the whole row. A two-way switch has another look, so that a reader can see which one changes the pane.
     - `rs-count` is a count after the words of a tab. Add `err` or `warn` only when the count needs attention.
     - A click or the left and right keys select a tab. The selected button has `on` and `aria-selected="true"`.
     - The panes are the siblings of the `nav` with `data-pane`. Only the selected one shows.
     - `tabs.select("b", true)` selects with no call of `onChange`. `tabs.current()` gives the selected tab.
+
+#### The options of a tab row
+
+Each option is an attribute of the `nav`. All are off by default. `rs.tabs.use(nav, onChange, {icons, fill, tint})` sets the same attributes.
+
+| Attribute | What it does |
+|---|---|
+| `data-icons` | An icon before each label. A tab gives the name of an icon in `data-icon`, or its own `<svg>` as its first child. |
+| `data-icons="top"` | The icon over a smaller label. Use it on a phone or in a narrow panel. |
+| `data-fill` | The tabs share the width of the row, with the labels in the center. A label that does not fit keeps its own width. |
+| `data-tint` | A tint of the accent behind the selected tab. |
+
+The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `list`, `info`, `road`, `building` (`rs.tabs.icons`). An unknown name is an error that gives the names.
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=tabs-icons" title="Tabs with icons, live" loading="lazy"></iframe>
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=tabs-fill" title="Tabs that fill the row, with a tint, live" loading="lazy"></iframe>
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=tabs-top" title="Tabs with the icon over the label, live" loading="lazy"></iframe>
+
+```html
+<nav class="rs-tabs" data-icons data-fill>
+  <button class="rs-tab on" data-tab="flow" data-icon="car">Traffic flow</button>
+  <button class="rs-tab" data-tab="speed" data-icon="gauge">Speed</button>
+  <button class="rs-tab" data-tab="noise" data-icon="volume">Noise</button>
+</nav>
+```
 
 ### An editor in the panel { .rs-part }
 
@@ -1317,7 +1345,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 
 ??? info "Details"
 
-    - They go in a tab or a button. On a filled tab or button, the badge is a darker teal with white text.
+    - They go in a tab or a button. On a filled button, the badge is a darker teal with white text. In a selected tab, it is the accent's tint.
 
 ## Help and hints { .rs-group }
 
