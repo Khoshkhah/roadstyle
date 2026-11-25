@@ -367,7 +367,10 @@ def test_a_slider_moves_by_a_click_on_its_track_or_a_label_and_by_its_keys(page)
         assert page.evaluate("P.sl3.value()") == want, key
     assert _got(page, "sl3")[-4:] == [0, 1, 8, 7]
     a, b = page.evaluate(_TRACK_AT, ["#sl3", 2 / 8]), page.evaluate(_TRACK_AT, ["#sl3", 5 / 8])
-    page.mouse.move(*a); page.mouse.down(); page.mouse.move(b[0], b[1], steps=5); page.mouse.up()   # press and drag on the track: one onChange
+    page.mouse.move(*a)                                                  # press and drag on the track: one onChange
+    page.mouse.down()
+    page.mouse.move(b[0], b[1], steps=5)
+    page.mouse.up()
     assert page.evaluate("P.sl3.value()") == 5 and _got(page, "sl3")[-2:] == [7, 5]
     page.mouse.click(*page.evaluate(_TRACK_AT, ["#sl", 0.2]))            # a slider with no marks: the track too
     assert page.evaluate("P.sl.value()") == 30
@@ -394,7 +397,7 @@ def test_the_parts_fit_a_phone(page_path):
             .filter(e => e.getBoundingClientRect().height < 40).map(e => e.className + ' ' + Math.round(e.getBoundingClientRect().height));
           return {wide, small, page: document.documentElement.scrollWidth - innerWidth}; }""")
         labels = pg.evaluate("[...document.querySelectorAll('#sl3 .rs-slider-tick')].map(t => { const r = t.getBoundingClientRect(); return [r.left, r.right]; })")
-        assert all(a[1] <= b[0] for a, b in zip(labels, labels[1:])), labels                     # the labels of the steps do not cover each other
+        assert all(a[1] <= b[0] for a, b in zip(labels, labels[1:], strict=False)), labels                     # the labels of the steps do not cover each other
         pg.locator("#sl3").scroll_into_view_if_needed()
         x, y = pg.evaluate(_TICK, 1)
         pg.touchscreen.tap(x, y)                                         # a finger on the label "4 m"
