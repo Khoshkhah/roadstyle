@@ -107,7 +107,17 @@ function _ovRow(ov, rule){
 const _ovBound = new Set();
 const _ovOfLayer = id => OVERLAYS.find(o=>o.layers.includes(id));
 // rsSetInteraction can make a layer clickable, or give it its tooltip, later; the handlers read ov.interactive and ov.tooltip on each move
-const _ovTips = ov=>ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   // true: every field (rsSetInteraction, a layer with no list)
+// rsSetTooltip(label, fn) (rs.tooltip): the hover tooltip of an overlay, made by the page: fn(properties) gives {title, rows: [[name, value], ...]} (the
+// title in bold, then one field on each line, as the other tooltips), or null for no tooltip on that feature. For values that are in the page, not in
+// the tiles (the level of a wall at the hour that the page shows). fn null: the overlay's own tooltip again.
+const _ovTipFn = {};
+export function rsSetTooltip(label, fn){
+  if(fn != null && typeof fn !== "function") throw new Error("rs.tooltip: give a function of the feature's properties, or null");
+  if(fn == null) delete _ovTipFn[label]; else _ovTipFn[label] = fn;
+}
+const _ovTipHtml = t => [t.title != null && t.title !== "" ? "<b>" + _esc(t.title) + "</b>" : null,
+                         ...(t.rows || []).map(([k, v]) => "<b>" + _esc(k) + "</b>: " + _esc(v))].filter(Boolean).join("<br>");
+const _ovTips = ov=>!!_ovTipFn[ov.label] || ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   // true: every field (rsSetInteraction, a layer with no list)
 function _ovBind(id){
   if(_ovBound.has(id)) return;
   _ovBound.add(id);
@@ -118,10 +128,12 @@ function _ovBind(id){
     _ovUnder=k;
     if(same(_ovHov)){ if(_ovTip && _ovTip.isOpen()) _ovTip.setLngLat(e.lngLat); return; }   // lit: its tooltip follows the mouse
     if(_ovHov){ _ovState(_ovHov,{hover:false}); _ovHov=null; if(_ovTip) _ovTip.remove(); }  // another one: the last off at once
-    clearTimeout(_ovT); const ll=e.lngLat, props=f.properties||{};
+    clearTimeout(_ovT); const ll=e.lngLat, props=_ovProps(ov, f);
     _ovT=setTimeout(()=>{ if(!same(_ovUnder)) return; _ovHov=k; if(ov.interactive) _ovState(_ovHov,{hover:true});
       if(_ovTip && _ovTips(ov)){
-        _ovTip.setLngLat(ll).setHTML(_rfields(props, ov.tooltip===true ? null : ov.tooltip)); if(!_ovTip.isOpen()) _ovTip.addTo(map); } }, _TIP_DELAY); });
+        const fn = _ovTipFn[ov.label], t = fn ? fn(props) : null;          // the page's own tooltip (rs.tooltip), else the overlay's fields
+        const html = fn ? (t ? _ovTipHtml(t) : "") : _rfields(props, ov.tooltip===true ? null : ov.tooltip);
+        if(html){ _ovTip.setLngLat(ll).setHTML(html); if(!_ovTip.isOpen()) _ovTip.addTo(map); } else _ovTip.remove(); } }, _TIP_DELAY); });
   map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor=""; clearTimeout(_ovT); _ovUnder=null;
     _ovState(_ovHov,{hover:false}); _ovHov=null;
     if(_ovTip) _ovTip.remove(); });
@@ -165,6 +177,7 @@ export function useOverlays(){
 }
 export function initOverlays(){
   window.rsSetOverlay = rsSetOverlay;
+  window.rsSetTooltip = rsSetTooltip;
   window.rsSetOverlays = rsSetOverlays;
   window.rsGetOverlays = rsGetOverlays;
   useOverlays();
