@@ -129,7 +129,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rs:scene3ddeselect` | a click that is not on the 3D scene, after one that was | none |
 | `rs:scene3dstatus` | the tiles that the view needs change, or one arrives | the same as `rsScene3dStatus()` |
 | **Built-in controls** | | |
-| `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`) | `rs:basemapchange` |
+| `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`). A base map with tiles or a style turns off the layers of the area's own base map (a duckOSM page's land, water, buildings); a blank one turns them on again. A key that is not on the page is an error that lists the page's keys | `rs:basemapchange` |
 | `rsSetClasses(list)` | show exactly these road classes | `rs:filterchange` |
 | `rsSetBridges(on)` | show / hide every bridge and its 3D deck | `rs:filterchange` |
 | `rsSetBridges3D(on)` | draw the bridges as 3D decks (on) or as flat lines (off); no argument: whether they are 3D. A page with no decks (`view_3d=False`) stays flat | `rs:bridges3dchange` |

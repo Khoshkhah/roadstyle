@@ -146,6 +146,9 @@ Each item below has the same form: a picture or a live page when there is one, a
     - It takes the keywords of `render_dashboard`: `overlays`, `boundary`, `live_data`, `page_script`, `color_options`, `minzoom`, `include`, `exclude`, `basemap`, `tiles` and the others. For example, `exclude=["ferry"]` removes the ferry routes, which can go far out of the area.
     - The key of `rs.setData` is the `edge_id` of the file as text: `String(edge_id)`.
     - The base map is cut to the area of the file (`main.boundary`). Thus a large polygon, for example the sea, does not make the page large.
+    - The layers of the file's base map (land, water, buildings, ...) show over a blank base map. When the person chooses a base map with tiles or a
+      style in the switcher (OpenFreeMap, OSM, the satellite), that base map replaces them: they are off while it shows, and come back with a blank base
+      map. Your overlays (`rs.Overlay`) stay over every base map.
     - `dashboard=True` is the docked dashboard of roadstyle with the colour option "Modes". `dashboard=False` (the default) has no panel.
 
 ## Options { .rs-group }

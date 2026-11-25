@@ -34,7 +34,7 @@ export function initTheme(){
     if(!current || !window.rsSetBasemap) return;
     // a page that starts in the dark theme changes it before the style is loaded: the base map's swap waits for the style, with the theme state
     const swap = () => {
-      if(e.detail.theme === "dark" && current.dark) window.rsSetBasemap(current.dark);
+      if(e.detail.theme === "dark" && current.dark && all.some(b => b.key === current.dark)) window.rsSetBasemap(current.dark);       // a twin that the page has
       else if(e.detail.theme === "light"){ const light = all.find(b => b.dark === current.key); if(light) window.rsSetBasemap(light.key); }
     };
     syncStyleTheme() ? swap() : map.once("style.load", swap);

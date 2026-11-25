@@ -150,6 +150,17 @@ function _ovBoxRows(){
   (stack ? _tlHost() : document.body).appendChild(box);
   _ovBox = box;
 }
+// The area's own base map (the style's base-map layers: duckOSM's land, water, buildings, ...; `base_map` in OVERLAYS) shows over a blank base map. A base map
+// with tiles or a style (OpenFreeMap, OSM, the satellite) replaces it: while that base map shows, the layers are off, and they come back with a blank one. The page's
+// own overlays (rs.Overlay) stay over every base map. basemap.js calls this at each change of the base map.
+export const _bmOwnMap = b => !b || (!b.style_url && !(b.tiles || []).length);
+let _ovMapOn = null;
+const _ovMapHid = new Set();      // the labels that a base map turned off, which a blank base map turns on again
+export function _ovOwnMap(on){
+  _ovMapOn = !!on;
+  if(on){ _ovMapHid.forEach(l => rsSetOverlay(l, true)); _ovMapHid.clear(); return; }
+  for(const ov of OVERLAYS) if(ov.base_map && ov.visible !== false){ _ovMapHid.add(ov.label); rsSetOverlay(ov.label, false); }
+}
 // the overlays of the style of the moment (at the start, and again for a new style: rs.setStyle): their handlers, their rows, and their start state
 export function useOverlays(){
   _OV_POPUP = O.overlay_popup;
@@ -157,6 +168,8 @@ export function useOverlays(){
   if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
   OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); ov.layers.forEach(_ovBind); if(_ovGroupOff || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
   window.RS_OVERLAYS = OVERLAYS;
+  if(_ovMapOn === null) _ovMapOn = _bmOwnMap((O.basemaps || [])[0]);        // the base map of the start
+  if(!_ovMapOn) _ovOwnMap(false);
   _ovBoxRows();
   _emit("rs:overlayschange", {visible: rsGetOverlays()});       // the base-map box and the legend box read the layers again
 }

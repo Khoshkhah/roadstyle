@@ -413,6 +413,9 @@ fn overlay_entry(ov: &Overlay, i: usize, sid: &str, ids: &[String], base: Map<St
         "base": if ov.edge { Value::Object(base) } else { Value::Null },
         "select": if u.is_some_and(|u| u.select == roadstyle_look::options::Select::Item) { "item" } else { "road" },
         "interactive": ov.clickable.unwrap_or(popup.is_none() || list(popup) != Value::Null)});
+    if u.is_none() {          // a layer of the area's own base map (duckOSM's land, water, buildings): a base map with tiles or a style replaces it (basemap.js)
+        entry["base_map"] = true.into();
+    }
     if !ov.kinds.is_empty() {          // a base-map layer's kinds with their counts, most first (the page's kind filter)
         entry["kinds"] = json!(ov.kinds);
     }

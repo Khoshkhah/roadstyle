@@ -4,6 +4,7 @@
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {defineTool, LAYERS_ICON} from "./tools.js";
 import {buildBox} from "./basemapbox.js";
+import {_ovOwnMap, _bmOwnMap} from "./overlays.js";
 let BASEMAPS = [];
 // A VECTOR STYLE as a base map (Basemap.style_url, e.g. OpenFreeMap): its sources and layers are merged into the page's map with the prefix
 // "vbm-", under the roads, and the raster base map is hidden. Its building extrusion (a fill-extrusion layer) moves to the end, so a road
@@ -128,7 +129,8 @@ export function rsSetBasemap(keyOrIdx){
   // a map with a dark twin (`dark`) is the twin in the dark theme, whoever asks (the box, the page, the theme)
   const twin = BASEMAPS[idx] && BASEMAPS[idx].dark && document.documentElement.dataset.rsTheme === "dark" ? BASEMAPS.findIndex(b=>b.key === BASEMAPS[idx].dark) : -1;
   if(twin >= 0) idx = twin;
-  const b = BASEMAPS[idx]; if(!b) return;
+  const b = BASEMAPS[idx];
+  if(!b) throw new Error("rsSetBasemap: " + JSON.stringify(keyOrIdx) + " is not a base map of this page; its base maps: " + BASEMAPS.map(x => x.key).join(", "));
   const n = ++_bmAsked;
   if(!b.style_url) clearVector();
   if(b.style_url){ mergeVector(b, n); }
@@ -141,6 +143,7 @@ export function rsSetBasemap(keyOrIdx){
     map.addSource("bm", {type:"raster", tiles:b.tiles, tileSize:256, maxzoom:b.maxzoom||19, attribution:b.attr||""});
     map.addLayer({...def, layout:{...(def.layout||{}), visibility:"visible"}}, after);
   } else if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility","none");
+  _ovOwnMap(_bmOwnMap(b));         // a base map with tiles or a style replaces the area's own base-map layers (overlays.js)
   map.setPaintProperty("bg","background-color", b.bg);
   map.getContainer().style.backgroundColor = b.bg;         // the sky of a tilted view (above the horizon) has the base map's color, not the white of the page
   const m = document.querySelector(".bm-menu");
