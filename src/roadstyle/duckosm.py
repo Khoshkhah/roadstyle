@@ -164,7 +164,7 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
     ``kwargs``: render_edges' keywords, as ``render_dashboard`` takes them (``overlays``, ``boundary``, ``live_data``, ``page_script``,
     ``color_options``, ``minzoom``, ``basemap``, ``tiles``, ``palette``, ...). Gives a ``WebMap`` (``.save(path)``)."""
     from . import render_web as rw
-    from ._engine import _look_and_options, _warn, page_given, rust
+    from ._engine import _lazy_files, _lazy_stand_ins, _look_and_options, _warn, page_given, rust
     from .render import vehicles_option
 
     if kwargs.get("planner"):
@@ -201,14 +201,17 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
     kw = vehicles_option(kw)                         # a SUMO run: its local files, roadstyle's vehicles module and the play bar
     # the keywords as render_edges converts them (overlays, boundary, chart rows, palette, profile, settings), over the duckOSM base map
     style = {k: kw.get(k) for k in ("palette", "profile", "settings")}
+    import shapely
+    first = shapely.from_wkb(roads.column("geometry")[0].as_py()) if roads.num_rows else None
+    kw, lazy = _lazy_stand_ins(kw, tuple(first.interpolate(0.5, normalized=True).coords[0]) if first is not None else (0.0, 0.0))
     lk, o = _look_and_options({**kw, **({"levels": level_kw} if level_kw is not None else {})},
                               base_map=_options(db, mode, theme, paths, None, {})["base_map"])
     # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
     page = json.loads(lk.part("base_map_page"))
     given = page_given({**{k: page.get(k) for k in ("basemap", "basemaps")}, **kw}, **style, lk=lk, args=o["args"])
-    html, files = rust().page_from(roads, lk, json.dumps(o), json.dumps(given), features)
+    html, files, sources = rust().page_from(roads, lk, json.dumps(o), json.dumps(given), features)
     _warn()
-    return rw.WebMap(html, files)
+    return rw.WebMap(html, _lazy_files(lk, lazy, sources, dict(files), kw.get("tile_format")))
 
 
 def _with_modes(roads):
