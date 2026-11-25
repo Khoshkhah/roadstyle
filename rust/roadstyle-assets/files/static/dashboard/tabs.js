@@ -6,9 +6,48 @@
 // A list of rows that a click selects (`<div class="rs-rows"><button class="rs-row" data-v="12">...</button>...</div>`) uses the same function: the
 // selected row has `on` and `aria-selected`, and the up and down arrows walk the rows.
 // `rs.toggle(button, onChange)` makes a button that stays pressed (`aria-pressed`) until the next click: {set(on, quiet), value()}.
+// The options of a tab row (the attributes of its `nav`, or `rs.tabs.use(nav, onChange, {icons, fill, tint})`, which sets them):
+//   data-icons ("inline", or "top": the icon over a smaller label) - each tab's icon before its label: its `data-icon` (a name of TAB_ICONS) or its own
+//   first `<svg>`; data-fill - the tabs share the row's width (a label that does not fit keeps its width); data-tint - a tint behind the selected tab.
+// outline icons on a 24 px grid in the tab's colour (currentColor), drawn for roadstyle
+const _TI = {
+  car: '<path d="M5 17H4a1 1 0 0 1-1-1v-4l2-5h12l2 5v4a1 1 0 0 1-1 1h-1M3 12h18M9.5 17h5"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/>',
+  gauge: '<path d="M4.5 18a9 9 0 1 1 15 0M12 14l4-5"/><circle cx="12" cy="14" r="1.5"/>',
+  volume: '<path d="M4 10v4h4l5 4V6l-5 4zM16.5 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"/>',
+  chart: '<path d="M4 20h16M7 16v-5M12 16V6M17 16V8"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  map: '<path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20zM9 4v13.5M15 6.5V20"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',
+  road: '<path d="M8 4 5 20M16 4l3 16M12 5v2M12 11v2M12 17v2"/>',
+  building: '<path d="M5 20V5l7-2v17M12 8h7v12M3 20h18M8 8h.01M8 12h.01M8 16h.01M15.5 12h.01M15.5 16h.01"/>',
+};
+export const TAB_ICONS = Object.keys(_TI);
+function _tabIcons(nav){
+  for(const t of nav.querySelectorAll(":scope > .rs-tab")){
+    if(t.querySelector(":scope > .rs-tab-ic")) continue;
+    const own = t.firstElementChild;
+    if(own && own.tagName.toLowerCase() === "svg"){ own.classList.add("rs-tab-ic"); own.setAttribute("aria-hidden", "true"); }
+    else if(t.dataset.icon){
+      if(!_TI[t.dataset.icon]) throw new Error("rs.tabs: no icon '" + t.dataset.icon + "' (the icons: " + TAB_ICONS.join(", ") + ")");
+      t.insertAdjacentHTML("afterbegin", '<svg class="rs-tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' + _TI[t.dataset.icon] + "</svg>");
+    }
+    // the label and its count in one box, so that the icon can go over them ("top")
+    const lb = document.createElement("span"); lb.className = "rs-tab-lb";
+    for(const n of [...t.childNodes]) if(!(n.classList && n.classList.contains("rs-tab-ic"))) lb.appendChild(n);
+    t.appendChild(lb);
+  }
+}
 export const rsTabs = {
-  use(nav, onChange){
+  icons: TAB_ICONS,
+  use(nav, onChange, opts){
     const isTabs = nav.classList.contains("rs-tabs"), isRows = nav.classList.contains("rs-rows"), idOf = el => el.dataset.tab !== undefined ? el.dataset.tab : el.dataset.v;
+    if(opts && isTabs){
+      if(opts.icons !== undefined && !["inline", "top", true, false].includes(opts.icons)) throw new Error('rs.tabs.use: icons is "inline", "top", true or false');
+      for(const k of ["icons", "fill", "tint"]) if(k in opts){ if(opts[k]) nav.setAttribute("data-" + k, opts[k] === true ? "" : opts[k]); else nav.removeAttribute("data-" + k); }
+    }
+    if(isTabs && nav.hasAttribute("data-icons")) _tabIcons(nav);
     const items = () => [...nav.querySelectorAll("[data-tab], [data-v]")];
     const [role, itemRole, mark] = isTabs ? ["tablist", "tab", "aria-selected"] : isRows ? ["listbox", "option", "aria-selected"] : ["radiogroup", "radio", "aria-checked"];
     nav.setAttribute("role", role);
