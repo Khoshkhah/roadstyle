@@ -426,3 +426,72 @@ def test_the_page_draws_the_base_maps_textures_and_icons(tmp_path):
         pg.wait_for_function("ids => ids.every(i => map.getImage(i) && map.getImage(i).data.width > 1)", arg=sorted(images), timeout=30000)
         browser.close()
     assert not [t for k, t in console if "could not be loaded" in t or "could not be read" in t], console
+
+
+def test_the_base_map_layers_are_marked_and_a_wrong_base_map_key_is_an_error(tmp_path):
+    """The area's own base-map layers carry `base_map` in the page's overlays (the base-map box's one switch takes them), the page's own do not. A key that
+    is not a base map of the page is an error that lists them (before, rsSetBasemap returned and nothing changed)."""
+    pw = pytest.importorskip("playwright.sync_api")
+    import shapely
+
+    import roadstyle as rs
+    from roadstyle import duckosm
+
+    pts = __import__("geopandas").GeoDataFrame({"PK": [1]}, geometry=shapely.points([[7.405, 43.73]]), crs=4326)
+    out = tmp_path / "b.html"
+    duckosm.page(_tiny(tmp_path / "b.duckdb"), "driving", levels="tags", overlays=[rs.Overlay(pts, kind="circle", label="Walls")]).save(str(out))
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        pg = browser.new_page()
+        errors = []
+        pg.on("pageerror", lambda e: errors.append(str(e)))
+        pg.route("https://**/*", lambda r: r.abort())
+        pg.goto(out.as_uri())
+        pg.wait_for_function("window.map && map.loaded && map.loaded() && window.RS_OVERLAYS", timeout=120000)
+        assert pg.evaluate("Object.fromEntries(RS_OVERLAYS.map(o => [o.label, !!o.base_map]))") == {"water": True, "Walls": False}
+        first = pg.evaluate("RS_BASEMAPS[0].key")
+        msg = pg.evaluate("(() => { try { rsSetBasemap('ofm_nothing'); } catch(e) { return e.message; } })()")
+        assert "not a base map of this page" in msg and first in msg, msg
+        browser.close()
+    assert errors == []
+
+
+def test_the_base_map_layers_switch_keeps_the_pages_overlays_and_rs_set_roads_keeps_the_names(tmp_path):
+    """The one switch of the base-map box ("Base map layers" on a duckOSM page) turns the base map's layers off, not the page's own overlays. rsSetRoads(false)
+    hides every road layer and keeps the street names (labels: true); shown again, each layer has its visibility back; rs.getState and rs.setState have it."""
+    pw = pytest.importorskip("playwright.sync_api")
+    import shapely
+
+    import roadstyle as rs
+    from roadstyle import duckosm
+
+    pts = __import__("geopandas").GeoDataFrame({"PK": [1]}, geometry=shapely.points([[7.405, 43.73]]), crs=4326)
+    out = tmp_path / "r.html"
+    page = duckosm.page(_tiny(tmp_path / "r.duckdb"), "driving", levels="tags", overlays=[rs.Overlay(pts, kind="circle", label="Walls")],
+                        dashboard={"toolbar": {}})
+    assert _opt(page.html, "overlays_label") == "Base map layers"
+    page.save(str(out))
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        pg = browser.new_page()
+        errors = []
+        pg.on("pageerror", lambda e: errors.append(str(e)))
+        pg.route("https://**/*", lambda r: r.abort())
+        pg.goto(out.as_uri())
+        pg.wait_for_function("window.map && map.loaded && map.loaded() && window.RS_OVERLAYS && window.rs", timeout=120000)
+        pg.evaluate("rsSetOverlays(false)")
+        assert pg.evaluate("Object.fromEntries(RS_OVERLAYS.map(o => [o.label, o.visible]))") == {"water": False, "Walls": True}
+        assert not pg.evaluate("rsGetOverlays()")
+        roads = """map.getStyle().layers.filter(l => ['simple', 'slots'].includes(l['source-layer'] || l.source))
+                   .map(l => [l.id, l.type === 'symbol' && !!l.layout['text-field'], map.getLayoutProperty(l.id, 'visibility') || 'visible'])"""
+        before = pg.evaluate(roads)
+        assert any(name for _, name, _ in before) and any(not name for _, name, _ in before), before
+        pg.evaluate("rs.on('state', s => { window.__st = s; }); rsSetRoads(false)")
+        assert all(vis == ("visible" if name else "none") for _, name, vis in pg.evaluate(roads))
+        assert pg.evaluate("rs.getState().roads") == {"on": False, "labels": True} and pg.evaluate("window.__st.roads.on") is False
+        pg.evaluate("rsSetRoads(false, {labels: false})")
+        assert all(vis == "none" for _, _, vis in pg.evaluate(roads))
+        pg.evaluate("rs.setState({roads: {on: true}})")
+        assert pg.evaluate(roads) == before
+        browser.close()
+    assert errors == []

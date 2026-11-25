@@ -128,7 +128,8 @@ export function rsSetBasemap(keyOrIdx){
   // a map with a dark twin (`dark`) is the twin in the dark theme, whoever asks (the box, the page, the theme)
   const twin = BASEMAPS[idx] && BASEMAPS[idx].dark && document.documentElement.dataset.rsTheme === "dark" ? BASEMAPS.findIndex(b=>b.key === BASEMAPS[idx].dark) : -1;
   if(twin >= 0) idx = twin;
-  const b = BASEMAPS[idx]; if(!b) return;
+  const b = BASEMAPS[idx];
+  if(!b) throw new Error("rsSetBasemap: " + JSON.stringify(keyOrIdx) + " is not a base map of this page; its base maps: " + BASEMAPS.map(x => x.key).join(", "));
   const n = ++_bmAsked;
   if(!b.style_url) clearVector();
   if(b.style_url){ mergeVector(b, n); }

@@ -150,8 +150,28 @@ export function rsSetAccess(kind, on){      // show / hide the roads of one acce
   on ? _accHid.delete(kind) : _accHid.add(kind); _applyRoadFilters();
   _emit("rs:filterchange", {access:kind, visible:!!on});
 }
+// rsSetRoads(on, {labels}): the drawing of the roads (fill, casing, dashes, arrows, bridges, tunnels: every layer of a road source) off, or on again. `labels`
+// (default true): the street names stay while the roads are off. Each layer gets back the visibility that it had (an arrow switch that is off stays off).
+// ponytail: a switch that shows a road layer while the roads are off (rsSetArrows) shows it; the next rsSetRoads(false) hides it again.
+let _roads = {on: true, labels: true};
+const _roadsVis = {};
+const _isName = l => l.type === "symbol" && !!l.layout && l.layout["text-field"] != null;
+function _roadsApply(){
+  for(const l of map.getStyle().layers.filter(x => RS_ROLES.has(_role(x)))){
+    const off = !_roads.on && !(_roads.labels && _isName(l));
+    if(off && !(l.id in _roadsVis)){ _roadsVis[l.id] = map.getLayoutProperty(l.id, "visibility") || "visible"; map.setLayoutProperty(l.id, "visibility", "none"); }
+    else if(!off && l.id in _roadsVis){ map.setLayoutProperty(l.id, "visibility", _roadsVis[l.id]); delete _roadsVis[l.id]; }
+  }
+}
+export function rsSetRoads(on, o){
+  _roads = {on: !!on, labels: !o || o.labels !== false};
+  _roadsApply();
+  _emit("rs:roadschange", {..._roads});
+}
 // a new roads style (rs.setStyle): its layers' own filters are read again, and the switches that are off hide its roads too
 export function useFilter(){
+  for(const k in _roadsVis) delete _roadsVis[k];
+  if(!_roads.on) _roadsApply();
   FILTER = O.filter; ACCESS = FILTER.access || [];
   // a class that the person has not seen yet shows; the ones that were switched off stay off
   if(_fltVis) FILTER.classes.forEach(c=>{ if(!_fltSeen.has(c)) _fltVis.add(c); });
@@ -172,6 +192,8 @@ export function useFilter(){
 export function initFilter(){
   map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
   window.rsSetClasses = rsSetClasses;
+  window.rsSetRoads = rsSetRoads;
+  window.rsGetRoads = () => ({..._roads});
   window.rsSetAccess = rsSetAccess;
   window.rsSetBridges = rsSetBridges;
   window.rsSetTunnels = rsSetTunnels;

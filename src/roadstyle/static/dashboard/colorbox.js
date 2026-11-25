@@ -3,7 +3,8 @@
 // (rs.setStyle) shows its own options. A page with no colour option has no such tool. The map's own "Colour by" and legend are hidden when
 // the page has a bar (dashboard.css).
 import {_esc} from "../popup.js";
-import {O, OVERLAYS, _emit} from "./core.js";
+import {O, _emit} from "./core.js";
+import {_ovGroup} from "./overlays.js";
 import {COLOR_OPTIONS, _coActive, rsSetColorField} from "./color.js";
 import {coLegendNow, coLegendExtra} from "./legend.js";
 import {replaceTool, greyTool, getTool, wrap, LEGEND_ICON} from "./tools.js";
@@ -13,10 +14,11 @@ function _cbClasses(){
   const f = O.filter || {}, sw = f.swatches || {};
   return (f.classes || []).map(c => '<div class="lg-row"><span class="lg-sw" style="background:' + _esc(sw[c] || "#888") + '"></span>' + _esc(c) + "</div>").join("");
 }
-// the style's own base-map layers, one row for each with its colour and no switch (the one switch is in the base-map box); a row of a layer that is hidden is dimmed
-const _cbLayers = () => !OVERLAYS.length || O.overlay_control === false ? "" :
+// the style's own base-map layers (the group of the base-map box's one switch, overlays.js), one row for each with its colour and no switch; a row of a layer
+// that is hidden is dimmed
+const _cbLayers = () => !_ovGroup().length || O.overlay_control === false ? "" :
   '<div class="rs-bm-h">' + _esc(O.overlays_label) + '</div><div class="rs-cb-lg rs-cb-layers">' +
-  OVERLAYS.map(ov => '<div class="lg-row' + (ov.visible === false ? " lg-off" : "") + '">' + (ov.color ? '<span class="lg-sw" style="background:' + _esc(ov.color) + '"></span>' : "") + _esc(ov.label) + "</div>").join("") + "</div>";
+  _ovGroup().map(ov => '<div class="lg-row' + (ov.visible === false ? " lg-off" : "") + '">' + (ov.color ? '<span class="lg-sw" style="background:' + _esc(ov.color) + '"></span>' : "") + _esc(ov.label) + "</div>").join("") + "</div>";
 let _cb = null;                // the box of the tool now: {box, fill}
 let _cbModes = null;             // the page's own colour modes (rs.colorModes): {names, active, onChange}; they take the place of the style's colour options in the box
 const _cbOptList = () => _cbModes ? _cbModes.names.map(name => ({name})) : COLOR_OPTIONS, _cbOptActive = () => _cbModes ? _cbModes.active : _coActive;
@@ -25,7 +27,7 @@ const _cbHasOpts = () => !!(COLOR_OPTIONS.length || _cbModes);
 // new style (rs.setStyle); the tool keeps its place in the bar
 export function useColorBox(){
   if(!(O.dashboard && O.dashboard.toolbar)) return;
-  const want = _cbHasOpts() || O.live || OVERLAYS.length > 0, has = getTool("legend") && !getTool("legend").disabled;       // a live-data page has the legend of its data, with no colour option
+  const want = _cbHasOpts() || O.live || _ovGroup().length > 0, has = getTool("legend") && !getTool("legend").disabled;       // a live-data page has the legend of its data, with no colour option
   if(!want){ _cb = null; if(has) greyTool("legend"); return; }
   if(has){ const t = getTool("legend"); t.title = t.el.querySelector("button").title = _cbHasOpts() ? "Colour by and legend" : "Legend"; return; }
   const b = document.createElement("button"), d = wrap(b), box = document.createElement("div");

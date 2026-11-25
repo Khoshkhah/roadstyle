@@ -12,7 +12,7 @@ with the controls hidden. How to use them together: [Dashboards](../guides/dashb
 
 ```js
 {v: 1, selection, highlight, colorBy, colors, filter: {classes, bridges, tunnels, access, ids}, fade, overlays: {label: {visible}},
- roadFill, tunnel, palette, view, basemap, view3d, camera: {center, zoom, pitch, bearing}, streetView: {mode}, google3d, panel}
+ roadFill, roads: {on, labels}, tunnel, palette, view, basemap, view3d, camera: {center, zoom, pitch, bearing}, streetView: {mode}, google3d, panel}
 ```
 
 | method | does |
@@ -35,7 +35,7 @@ with the controls hidden. How to use them together: [Dashboards](../guides/dashb
 | `rs.holdSelectLook(key, on)` | while a key holds it, a selection of a road or an overlay item sets no `select` state, so the host draws its own selection. `rs:select` and `rs:deselect` still come. The look of the selection now goes off at once |
 | `rs.query({column: value})`, `rs.find(text)`, `rs.props(id)` | edge ids of the roads that match; one road's properties |
 | `rs.setColorBy(name)`, `rs.color([{color, ids}])`, `rs.setFilter({classes, bridges, tunnels, access, ids})` | as the controls |
-| `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box (its label is `overlays_label`, default "Map layers"). Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |
+| `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box (its label is `overlays_label`, default "Map layers", on `duckosm.page` "Base map layers"). The page's own overlays (`rs.Overlay`) are not in it when the page has base-map layers: switch them with `rsSetOverlay`, and give them a row of their own with `rsAddTopRow`. A page with no base-map layer has its own overlays in the switch. Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.basemaps()` | the page's base maps as `[{key, label}]`, for `rs.setBasemap` (Ask's `get_map` uses it) |
 | `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()` (each tool with its `kind`, `open` and `disabled` state; a tool that the page cannot use is greyed out, and its title says why), and `ready()` (with `toolbar.hold`). `rs.on("tool", fn)` tells of each open, close and press. The built-in tools are `theme`, `navigate` (with `navigation: "buttons"`: `zoom_in`, `zoom_out`, `compass`), `street_view`, `google_3d`, `basemap`, `roads`, `buildings`, `legend`, `settings`, `attribution` and `panel_show`. The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
@@ -129,7 +129,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rs:scene3ddeselect` | a click that is not on the 3D scene, after one that was | none |
 | `rs:scene3dstatus` | the tiles that the view needs change, or one arrives | the same as `rsScene3dStatus()` |
 | **Built-in controls** | | |
-| `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`) | `rs:basemapchange` |
+| `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`). A key that is not on the page is an error that lists the page's keys | `rs:basemapchange` |
 | `rsSetClasses(list)` | show exactly these road classes | `rs:filterchange` |
 | `rsSetBridges(on)` | show / hide every bridge and its 3D deck | `rs:filterchange` |
 | `rsSetBridges3D(on)` | draw the bridges as 3D decks (on) or as flat lines (off); no argument: whether they are 3D. A page with no decks (`view_3d=False`) stays flat | `rs:bridges3dchange` |
@@ -143,6 +143,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetTunnelStyle({strength, palette, ratio, toward})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]`, `toward` a name of `RS_TUNNEL_TOWARDS` or a `#rrggbb` (any may be left out; another `toward` throws) | `rs:tunnelchange` |
 | `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |
+| `rsSetRoads(on, {labels})`, `rsGetRoads()` | hide or show the drawing of the roads: every layer of a road source (fill, casing, dashes, arrows, bridges, tunnels). `labels` (default `true`) keeps the street names while the roads are hidden. Shown again, each layer gets back the visibility that it had. In `rs.getState()` as `roads: {on, labels}`; `rs.setState({roads: {on: false}})` | `rs:roadschange` |
 | `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays. Every road piece is in the road layer `roads-simple` (source `simple`) and its dash layer `roads-simple-dash`; this function, `rsColor` and `rsSetColorField` set it too | `rs:roadfillchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
 | `rsSetTheme("light" \| "dark")` | switch the page theme (a base map with a dark twin follows it) | `rs:themechange` |
@@ -190,6 +191,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio`, `toward` |
 | `rs:viewselect` | `rsSetView` | `view` (name), `index` |
 | `rs:roadfillchange` | `rsSetRoadFill` | `road_fill` |
+| `rs:roadschange` | `rsSetRoads` | `on`, `labels` |
 | `rs:streetviewchange` | `rsSetStreetView` | `open` |
 | `rs:google3dchange` | `rsSetGoogle3D` | `open` |
 | `rs:streetviewmove` | `rsStreetViewStep` | `id`, `streetView`, `atStart`, `atEnd` |

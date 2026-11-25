@@ -195,6 +195,7 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
         kw = {"template": "dashboard", "dashboard": dashboard, **kw}
     else:
         kw = {"template": "dashboard", "dashboard": {"panel": None}, **kw}
+    kw.setdefault("overlays_label", "Base map layers")   # the one switch of the base map's layers (the page's own overlays are not in it)
     if "ground" not in kw:
         kw["ground"] = ground(db)                    # the area's own ground when the file has one (the standard "The ground reference")
     kw = vehicles_option(kw)                         # a SUMO run: its local files, roadstyle's vehicles module and the play bar
