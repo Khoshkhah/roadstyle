@@ -83,6 +83,19 @@ class Overlay:
             raise ValueError(f"Overlay select must be 'road' or 'item', not {self.select!r}")
 
 
+def fc_text(data) -> str:
+    """``to_fc(data)`` as JSON text, made without the Python dicts of its features for a GeoDataFrame or a GeoSeries (``to_json``): an overlay
+    of a million polygons as dicts is gigabytes (noise-map, 2026-11-25)."""
+    if hasattr(data, "to_crs"):
+        try:
+            data = data.to_crs(4326)
+        except Exception:
+            pass
+    if hasattr(data, "to_json"):
+        return data.to_json()
+    return json.dumps(to_fc(data))
+
+
 def to_fc(data) -> dict:
     """Normalise overlay ``data`` to a GeoJSON FeatureCollection in EPSG:4326 (properties kept)."""
     if hasattr(data, "to_crs"):

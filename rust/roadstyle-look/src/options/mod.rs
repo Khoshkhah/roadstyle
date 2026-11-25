@@ -183,6 +183,17 @@ impl MapOptions {
 
     /// These options with the flat keywords `args` over them: each field that a keyword sets changes, the others stay. The names of the
     /// keywords that are not map options, as `from_args`.
+    /// These options with `overlays` (rs.Overlay's fields, as the keyword `overlays=`) in place of their own. The overlays' data is moved, not copied:
+    /// with_args holds three copies of it, and a page of a million polygons took 6 GB to read them (noise-map, 2026-11-25).
+    pub fn with_overlays(&self, overlays: Value) -> Result<MapOptions, Error> {
+        let Value::Array(list) = overlays else { return Err(Error::Options(format!("overlays: a list, not {overlays}"))) };
+        let list = list.into_iter().map(|o| {
+            let v = flat::overlay_from_flat_owned(o)?;
+            serde_json::from_value::<Overlay>(v).map_err(|e| Error::Options(format!("overlays: {e}")))
+        }).collect::<Result<Vec<_>, _>>()?;
+        Ok(MapOptions { overlays: list, ..self.clone() })
+    }
+
     pub fn with_args(&self, args: &Value) -> Result<(MapOptions, Vec<String>), Error> {
         let f = flat(args)?;
         let Value::Object(mut base) = serde_json::to_value(self).expect("the map options are JSON") else { unreachable!("a mapping") };

@@ -196,7 +196,7 @@ def _look_and_options(kwargs, base_map=None):
     if sec["roads"]["twin_casing"] not in ("one", "each"):
         raise ValueError(f'twin_casing must be "one" or "each", got {sec["roads"]["twin_casing"]!r}')
     if overlays:
-        lk = lk.with_arg("overlays", json.dumps([_overlay_json(ov, sec["overlays"].get("styles") or {}) for ov in overlays]))
+        lk = lk.with_arg("overlays", "[" + ",".join(_overlay_json(ov, sec["overlays"].get("styles") or {}) for ov in overlays) + "]")
     return lk, o
 
 
@@ -241,12 +241,12 @@ def own_style_names(palette=None, profile=None) -> list[str]:
     return out
 
 
-def _overlay_json(ov, styles) -> dict:
-    """An rs.Overlay (or its data) as the engine reads it: its fields (render_web._styled: a style's fields where the overlay gives none), and
-    its data as GeoJSON in ``fc`` (overlays.to_fc)."""
+def _overlay_json(ov, styles) -> str:
+    """An rs.Overlay (or its data) as the engine reads it, as JSON text: its fields (render_web._styled: a style's fields where the overlay gives
+    none), and its data as GeoJSON in ``fc`` (overlays.fc_text: no Python dict of a feature)."""
     import dataclasses
 
-    from .overlays import Overlay, to_fc
+    from .overlays import Overlay, fc_text
 
     ov = ov if isinstance(ov, Overlay) else Overlay(data=ov)
     if ov.style:
@@ -257,9 +257,8 @@ def _overlay_json(ov, styles) -> dict:
         if bad:
             raise ValueError(f"overlay style {ov.style!r}: unknown field(s) {sorted(bad)}; the fields are {sorted(fields)}")
         ov = dataclasses.replace(ov, **{k: v for k, v in styles[ov.style].items() if getattr(ov, k) is None})
-    out = {f.name: getattr(ov, f.name) for f in dataclasses.fields(Overlay) if f.name != "data"}
-    out["fc"] = json.loads(json.dumps(to_fc(ov.data)))
-    return out
+    out = json.dumps({f.name: getattr(ov, f.name) for f in dataclasses.fields(Overlay) if f.name != "data"})
+    return out[:-1] + ', "fc": ' + fc_text(ov.data) + "}"
 
 
 def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel", method="solve", highway_col="highway",
