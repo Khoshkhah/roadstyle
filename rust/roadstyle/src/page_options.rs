@@ -368,7 +368,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         mapillary_token: k.mapillary_token.clone().unwrap_or_default(),
         select_color: ctl["select_color"].clone(), dock: ctl["dock"].clone(), vehicle_look: ctl["vehicle_look"].clone(), vehicles: k.vehicles.clone(), filter: ctl["filter"].clone(), filter_control: k.filter_control,
         color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend, hillshade: k.hillshade, terrain: k.terrain, terrain_exaggeration: k.terrain_exaggeration, terrain_tunnels: k.terrain_tunnels.clone(), buildings_opacity: k.buildings_opacity, ground: k.ground.clone(), scene_3d: crate::scene3d::option(&k.scene_3d, &k.ground)?,
-        color_active: ctl["color_active"].clone(), overlays: overlays_with_rows(&ctl["overlays"], &inter["base_props"]), overlay_control: k.overlay_control, overlays_label: k.overlays_label.clone(),
+        color_active: ctl["color_active"].clone(), overlays: overlays_with_rows(&ctl["overlays"], &inter["base_props"]), overlay_control: k.overlay_control, overlays_label: k.overlays_label.clone(), boundary_shape: meta["roadstyle:boundary_shape"].clone(),
         overlay_popup: k.overlay_popup, tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
         views: Value::Array(views), items: ctl["items"].clone(), road_popup: inter["popup"].clone(), road_tooltip: inter["tooltip"].clone(),
         // the page's hover_delay_ms, else the look's (roadstyle:interaction)
@@ -810,6 +810,10 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>, lazy: bool) -> Re
     files.extend(rows);
     if !urls.is_empty() {
         style["metadata"]["roadstyle:interaction"]["base_props"] = Value::Object(urls);
+    }
+    // the boundary's GeoJSON for the dashboard (boundary.js: the shade and the camera limits): in tiles, the page has no GeoJSON source of it
+    if let Some((_, crate::sources::Source::Json(b))) = s.shown().find(|(k, _)| *k == "boundary") {
+        style["metadata"]["roadstyle:boundary_shape"] = b["data"].clone();
     }
     Ok((style, archives, files))
 }

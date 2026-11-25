@@ -162,3 +162,21 @@ def test_a_road_with_its_fill_off_is_two_borders_with_an_empty_middle(tmp_path):
         finally:
             browser.close()
     assert errors == []
+
+
+def test_the_boundary_limits_the_camera_on_a_tiled_page(tmp_path):
+    """boundary_limit=True on a tiled page: the boundary is a tile layer there, with no GeoJSON source, so the page gives its shape (O.boundary_shape).
+    The camera's lowest zoom comes from the boundary, and a move far out comes back. Before, a tiled page had no limit."""
+    from shapely.geometry import box
+    path = tmp_path / "b.html"
+    rs.render_dashboard(_edges(), basemap="blank", boundary=box(17.999, 59.299, 18.006, 59.311), boundary_limit=True).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            assert page.evaluate("map.getSource('roads').type") == "vector"
+            page.wait_for_function("map.getMinZoom() > 5", timeout=10_000)
+            page.evaluate("map.jumpTo({center: [18.5, 59.0]})")
+            page.wait_for_function("Math.abs(map.getCenter().lng - 18.0) < 0.05", timeout=10_000)     # back inside the boundary's bounds and margin
+        finally:
+            browser.close()
+    assert errors == []
