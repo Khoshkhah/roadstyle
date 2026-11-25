@@ -100,6 +100,9 @@ pub struct PageOptions {
     /// a tiled page: the boundary's GeoJSON (its outline is a tile layer; boundary.js reads the shape here). Null: the boundary's source has it
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub boundary_shape: Value,
+    /// a tiled page: the hidden overlays that are not in the starting style, `{order, sources}` (page_options.rs `lazy_layers`; overlays.js adds them)
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub overlay_layers: Value,
     pub overlay_popup: bool,
     pub tunnel: Value,
     pub fill_layers: Value,

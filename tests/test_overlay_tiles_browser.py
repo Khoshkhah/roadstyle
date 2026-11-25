@@ -50,11 +50,11 @@ def test_a_hidden_overlay_has_its_own_source_and_loads_no_tile_until_it_shows(tm
         try:
             page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
             src = page.evaluate("map.getStyle().sources")
-            assert src["ov1"]["tiles"] == ["pmtiles://ov1/{z}/{x}/{y}"] and "url" not in src["ov1"], src["ov1"]
-            assert page.evaluate("window.__rs_tiles.archives") == ["roads", "ov1"] and "ov0" not in src
-            assert page.evaluate("map.getStyle().layers.filter(l => l['source-layer'] === 'ov1').map(l => l.source)") == ["ov1", "ov1"]
+            own = page.evaluate("O.overlay_layers.sources.ov1")         # hidden: out of the starting style, in the page's options
+            assert own["source"]["tiles"] == ["pmtiles://ov1/{z}/{x}/{y}"] and "url" not in own["source"], own["source"]
+            assert page.evaluate("window.__rs_tiles.archives") == ["roads", "ov1"] and "ov0" not in src and "ov1" not in src
+            assert [l["source"] for l in own["layers"]] == ["ov1", "ov1"] and all(l["source-layer"] == "ov1" for l in own["layers"])
             assert page.evaluate("map.querySourceFeatures('roads', {sourceLayer: 'ov0'}).length") > 0
-            assert page.evaluate("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length") == 0       # hidden: no tile asked for
             page.evaluate("document.addEventListener('rs:select', e => { window.__sel = e.detail; })")
             page.evaluate("rsSetOverlay('zones', false); rsSetOverlay('hidden', true)")
             page.wait_for_function("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length > 0", timeout=20_000)
@@ -276,3 +276,49 @@ def test_data_as_a_function_needs_lazy_overlays_and_a_kind():
         rs.render_dashboard(_edges(), basemap="blank", overlays=[rs.Overlay(_zones, kind="fill", visible=False)])
     with pytest.raises(ValueError, match="needs kind="):
         rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True, overlays=[rs.Overlay(_zones, visible=False)])
+
+
+def test_a_thousand_hidden_overlays_are_not_in_the_starting_style(tmp_path):
+    """The caller's hidden overlays with a source of their own are outside the starting style (O.overlay_layers): MapLibre walks every layer at each
+    frame, and a page of 1,215 hidden overlays could not pan. rsSetOverlay(label, true) adds the overlay's source and layers at their place (an
+    "under" overlay under the roads), with its click and its tooltip; false takes them away. A paint change made while it is out (a page's script)
+    is in the layer when it shows."""
+    import geopandas as gpd
+    from shapely.geometry import box
+    n = 1000
+    cells = [gpd.GeoDataFrame({"k": [i]}, geometry=[box(18.0 + (i % 40) * 1.5e-4, 59.3 + (i // 40) * 4e-4, 18.0001 + (i % 40) * 1.5e-4, 59.3003 + (i // 40) * 4e-4)],
+                              crs=4326) for i in range(n)]
+    ovs = [rs.Overlay(c, kind="fill", label=f"cell {i}", placement="under", visible=False, popup=["k"]) for i, c in enumerate(cells)]
+    path = tmp_path / "t.html"
+    rs.render_dashboard(_edges(), basemap="blank", overlays=[rs.Overlay(_zones(), kind="fill", label="zones", popup=["zone"])] + ovs).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            st = page.evaluate("(() => { const s = map.getStyle(); return {layers: s.layers.length, sources: Object.keys(s.sources).length, lazy: Object.keys(O.overlay_layers.sources).length}; })()")
+            assert st["lazy"] == n and st["layers"] < 60 and st["sources"] < 10, st
+            src = page.evaluate("RS_OVERLAYS.find(o => o.label === 'cell 0').source")
+            lid = page.evaluate(f"O.overlay_layers.sources['{src}'].layers[0].id")
+            page.evaluate(f"map.setPaintProperty('{lid}', 'fill-color', '#ff0000')")              # a page's change while the overlay is out
+            page.evaluate("rs.tooltip('cell 0', p => ({title: 'Cell', rows: [['k', p.k]]})); rsSetOverlay('zones', false); rsSetOverlay('cell 0', true)")
+            ids = page.evaluate("map.getStyle().layers.map(l => l.id)")
+            assert lid in ids and ids.index(lid) < ids.index("roads-simple"), "under the roads"
+            assert page.evaluate(f"map.getPaintProperty('{lid}', 'fill-color')") == "#ff0000"
+            assert page.evaluate(f"map.getLayoutProperty('{lid}', 'visibility')") == "visible"
+            page.evaluate("map.jumpTo({center: [18.00005, 59.30015], zoom: 18})")
+            page.wait_for_function("map.areTilesLoaded() && map.loaded()", timeout=20_000)
+            page.evaluate("document.addEventListener('rs:select', e => { window.__sel = e.detail; })")
+            x, y = page.evaluate("(() => { const q = map.project([18.00005, 59.30015]); return [q.x, q.y]; })()")
+            page.mouse.move(x - 40, y)
+            page.mouse.move(x, y)
+            page.wait_for_selector(".rs-tip .maplibregl-popup-content", timeout=5_000)
+            assert page.inner_html(".rs-tip .maplibregl-popup-content").startswith("<b>Cell</b><br><b>k</b>: 0")
+            page.mouse.click(x, y)
+            page.wait_for_function("window.__sel", timeout=5_000)
+            assert page.evaluate("window.__sel.overlay") == "cell 0" and page.evaluate("window.__sel.properties.k") == 0
+            page.evaluate("rsSetOverlay('cell 0', false)")
+            assert page.evaluate(f"[!!map.getSource('{src}'), !!map.getLayer('{lid}')]") == [False, False]
+            page.evaluate("rsSetOverlay('cell 0', true)")                    # again: its definition kept the change
+            assert page.evaluate(f"map.getPaintProperty('{lid}', 'fill-color')") == "#ff0000"
+        finally:
+            browser.close()
+    assert errors == []

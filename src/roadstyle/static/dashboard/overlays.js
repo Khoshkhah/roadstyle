@@ -87,9 +87,46 @@ const _ovAllLayers = ov => {
   const role = ov.source.slice(RS_PREFIX.length);
   return [...new Set([...ov.layers, ...map.getStyle().layers.filter(l=>_role(l)===role).map(l=>l.id)])].filter(id=>map.getLayer(id));
 };
+// Hidden overlays outside the starting style (O.overlay_layers, page_options.rs `lazy_layers`): an overlay's source and layers are added when it shows,
+// each layer before the next layer of the style's order that the map has, and taken away when it hides. A page of a thousand hidden overlays then pans
+// as fast as one with none (MapLibre walks every layer of the style at each frame).
+const _ovLazyOf = ov => ((O.overlay_layers || {}).sources || {})[ov.source];
+function _ovLazyAdd(ov){
+  const z = _ovLazyOf(ov), order = O.overlay_layers.order;
+  if(!z || map.getSource(ov.source)) return;
+  map.addSource(ov.source, z.source);
+  for(const l of z.layers){
+    const i = order.indexOf(l.id), before = order.slice(i + 1).find(id => map.getLayer(id));
+    map.addLayer({...l, layout: {...(l.layout || {}), visibility: "visible"}}, before);
+  }
+}
+function _ovLazyRemove(ov){
+  const z = _ovLazyOf(ov);
+  if(!z || !map.getSource(ov.source)) return;
+  if(_ovSel && _ovSel.source === ov.source) clearOvSel();
+  if(_ovHov && _ovHov.source === ov.source) _ovHov = null;
+  // the page's own changes of a layer (paint, layout, filter) stay in its definition for the next time it shows
+  for(const l of z.layers) if(map.getLayer(l.id)){ const s = map.getStyle().layers.find(x => x.id === l.id); Object.assign(l, {paint: s.paint, layout: s.layout, filter: s.filter}); map.removeLayer(l.id); }
+  map.removeSource(ov.source);
+}
+// A page's script can change a layer of a hidden overlay while it is out of the map (noise-map sets its points' colour at the start): get and set of
+// paint, layout and filter on such a layer read and change its definition, which the overlay is added with.
+function _ovLazyCalls(){
+  if(!O.overlay_layers || map.__rsLazy) return;
+  map.__rsLazy = true;
+  const out = id => { if(map.getLayer(id)) return null; for(const z of Object.values(O.overlay_layers.sources)){ const l = z.layers.find(x => x.id === id); if(l) return l; } return null; };
+  const wrap = (name, f) => { const own = map[name].bind(map); map[name] = (id, ...a) => { const l = out(id); return l ? f(l, ...a) : own(id, ...a); }; };
+  wrap("getPaintProperty", (l, k) => (l.paint || {})[k]);
+  wrap("setPaintProperty", (l, k, v) => { (l.paint = l.paint || {})[k] = v; return map; });
+  wrap("getLayoutProperty", (l, k) => (l.layout || {})[k]);
+  wrap("setLayoutProperty", (l, k, v) => { if(k !== "visibility") (l.layout = l.layout || {})[k] = v; return map; });   // rsSetOverlay decides if it shows
+  wrap("getFilter", l => l.filter);
+  wrap("setFilter", (l, f) => { l.filter = f; return map; });
+}
 export function rsSetOverlay(labelOrIdx, on){
   const i = typeof labelOrIdx==="number" ? labelOrIdx : OVERLAYS.findIndex(o=>o.label===labelOrIdx);
   const ov = OVERLAYS[i]; if(!ov) return;
+  if(_ovLazyOf(ov)) on ? _ovLazyAdd(ov) : _ovLazyRemove(ov);
   _ovAllLayers(ov).forEach(id=>map.setLayoutProperty(id,"visibility", on?"visible":"none"));
   ov.visible = !!on;
   if(on) _ovFetch(ov);
@@ -168,6 +205,7 @@ function _ovBoxRows(){
 // the overlays of the style of the moment (at the start, and again for a new style: rs.setStyle): their handlers, their rows, and their start state
 export function useOverlays(){
   _OV_POPUP = O.overlay_popup;
+  _ovLazyCalls();
   clearOvSel(); _ovHov = null; _ovUnder = null;
   if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
   OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); ov.layers.forEach(_ovBind); if((_ovGroupOff && _ovGroup().includes(ov)) || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
