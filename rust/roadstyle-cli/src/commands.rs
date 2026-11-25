@@ -184,6 +184,7 @@ fn page_cmd(roads: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) ->
     let html = page.html.replacen("__MAPLIBRE_CSS__", MAPLIBRE_CSS, 1)
         .replacen("__MAPLIBRE_JS__", &MAPLIBRE_JS.replace("</script>", "<\\/script>"), 1);
     std::fs::write(out, &html).map_err(|e| Error::File(format!("{out}: {e}")))?;
+    page.write_files(std::path::Path::new(out).parent().unwrap_or(std::path::Path::new(".")))?;
     println!("{out} {} bytes", html.len());
     Ok(())
 }

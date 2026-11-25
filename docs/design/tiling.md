@@ -65,6 +65,33 @@ pays this only while it shows. A hidden overlay that started shown stays in `roa
 **Not done:** the map worker (`rs://`), `export_style` and `roadstyle tiles` keep every overlay in `roads`. The page of noise-map uses the
 embedded archive.
 
+## Overlays in files (2026-11-24)
+
+With `lazy_overlays=True`, the archive of each overlay that has its own source (above) is a file next to the page, not base64 in the page. The rows of
+the overlay (`roadstyle:interaction.base_props`) are a file too. `page_options::tiled_page` makes them (`PageFile`), `Page.files` gives them, and
+`WebMap.save` (Python), `roadstyle page` (CLI) and the MCP server write them. The engine in the browser (wasm) cannot write files: there,
+`lazy_overlays=True` is an error.
+
+| File | Format | The page reads it |
+|---|---|---|
+| `rs-files/ovN-<hash>.pmtiles.gz` | The overlay's PMTiles archive (MLT tiles) as one gzip stream | `tiles.html`, at the first tile read of the source `ovN`: one fetch, then inflated |
+| `rs-files/ovN-<hash>.json.gz` | The overlay's rows (`crate::rows_file`), gzipped | `overlays.js` (`_ovFetch`), when `rsSetOverlay` first shows the overlay |
+
+**Why this format.** It is the format that the page has already: the tiles are cut by the engine, and the page reads them with the code that reads the
+archives in the page. A GeoJSON or FlatGeobuf file makes MapLibre cut the features in the browser (on the noise page, 1 M vertices of surface).
+A Parquet file needs a Parquet reader in the page. One gzip stream for each overlay is one request, and it is smaller than the tiles gzipped one by
+one (see above). The hash in the name keeps the files of two pages in one folder apart, and a browser can keep a file in its cache.
+
+**A web server is necessary.** `fetch` does not read a `file://` address. A server that gives a `.gz` file with `Content-Encoding: gzip` gives
+it inflated: the page inflates only bytes that start with the gzip header.
+
+**Measured** on noise-map's page (89 hidden overlays; Chromium, local server, the median of 3 loads):
+
+| Page | HTML | Files | First load (map loaded, tiles loaded) | JS heap after the load | First show of one surface overlay |
+|---|---|---|---|---|---|
+| Overlays in the page | 48.5 MB | none | 2.91 s | 254 MB | 320 ms |
+| `lazy_overlays=True` | 17.0 MB | 178 files, 23.7 MB | 2.24 s | 92 MB | 334 ms |
+
 ## Why these values (Nacka, 22,191 roads, measured 2026-10-29)
 
 The embedded archive, the tiles of one page:

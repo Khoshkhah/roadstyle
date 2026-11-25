@@ -418,14 +418,15 @@ fn page_of_json(style: String, page: String, parts: String, pmtiles: Option<Vec<
     roadstyle::page::page_of_json(&style, &page, &parts, pmtiles.as_deref()).map_err(py_err)
 }
 
-/// page_from(roads, look, options, given) -> str: the page of the roads (an Arrow table) in one call (roadstyle::page_options), as
+/// page_from(roads, look, options, given) -> (str, [(path, bytes)]): the page of the roads (an Arrow table) in one call (roadstyle::page_options), as
 /// render_edges(backend="web"). `options`: the look's options (JSON text: palette, profile, settings, features, files), which a view's
 /// palette resolves again; `given`: the caller's values over the look's args (JSON text: basemap and basemaps as resolved entries,
 /// api_key, street_view_key); `features`: a duckOSM map's base map (an Arrow table). MapLibre stays a placeholder (WebMap puts it in).
+/// The files go next to the page (`lazy_overlays=True`; none else): their paths are relative to the page.
 #[pyfunction]
 #[pyo3(signature = (roads, look, options, given, features=None))]
 fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, options: String, given: String, features: Option<&Bound<'_, PyAny>>)
-             -> PyResult<String> {
+             -> PyResult<(String, Vec<(String, Py<pyo3::types::PyBytes>)>)> {
     let options: roadstyle::look::Options = serde_json::from_str(&options).map_err(|e| PyValueError::new_err(format!("options: {e}")))?;
     let given: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&given).map_err(|e| PyValueError::new_err(format!("given: {e}")))?;
     let (look, roads, features) = (&look.0, stream(roads)?, features.map(stream).transpose()?);
@@ -437,7 +438,8 @@ fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, 
     })
         .map_err(py_err)?;
     warned(&page.warnings);
-    Ok(page.html)
+    let files = page.files.iter().map(|(p, b)| (p.clone(), pyo3::types::PyBytes::new(py, b).unbind())).collect();
+    Ok((page.html, files))
 }
 
 /// page_key_defaults() -> str: the defaults of the keywords that only the page reads (JSON text), which page_from takes for a keyword that

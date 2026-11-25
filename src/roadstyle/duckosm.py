@@ -205,9 +205,9 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
     # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
     page = json.loads(lk.part("base_map_page"))
     given = page_given({**{k: page.get(k) for k in ("basemap", "basemaps")}, **kw}, **style, lk=lk, args=o["args"])
-    html = rust().page_from(roads, lk, json.dumps(o), json.dumps(given), features)
+    html, files = rust().page_from(roads, lk, json.dumps(o), json.dumps(given), features)
     _warn()
-    return rw.WebMap(html)
+    return rw.WebMap(html, files)
 
 
 def _with_modes(roads):
