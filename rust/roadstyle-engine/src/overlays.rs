@@ -292,7 +292,7 @@ pub fn styled_layers(facts: &[LayerFacts], look: &crate::Look) -> (Vec<Overlay>,
 
 /// mapstyle's start value of a base-map layer's clickable: the decoration (landcover, water, paved and the lines but the raceway and the
 /// other ways) is not, so that a click reaches the road under it.
-fn clickable(name: &str, kind: &str) -> bool {
+pub(crate) fn clickable(name: &str, kind: &str) -> bool {
     !(matches!(name, "landcover" | "water" | "paved") || (kind == "line" && !matches!(name, "raceway" | "other_ways")))
 }
 

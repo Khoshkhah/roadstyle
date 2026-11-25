@@ -18,6 +18,7 @@ pub(super) fn kind_match(colors: &Value, default: &Value) -> Value {
 /// mapstyle.export._swap: a hover / select `case` kept around a new base colour.
 pub(super) fn ms_swap(expr: Option<&Value>, value: Value) -> Value {
     match expr.and_then(Value::as_array) {
+        // the hover and select `case`: its last branch is the base colour
         Some(a) if a.first() == Some(&json!("case")) => {
             let mut a = a.clone();
             a.pop();
@@ -25,6 +26,20 @@ pub(super) fn ms_swap(expr: Option<&Value>, value: Value) -> Value {
             Value::Array(a)
         }
         _ => value,
+    }
+}
+
+/// `ms_swap` through a colour set by feature id around the `case` (rsColor on an overlay): the base colour is in the `case`, its last item. For a layer
+/// that a click selects (its hover and select colours stay); a decoration (landcover) keeps the shorter expression of `ms_swap`.
+fn swap_in(expr: Option<&Value>, value: Value) -> Value {
+    match expr.and_then(Value::as_array) {
+        Some(a) if a.first() == Some(&json!("coalesce")) && a.last().and_then(Value::as_array).is_some_and(|c| c.first() == Some(&json!("case"))) => {
+            let mut a = a.clone();
+            let last = a.pop();
+            a.push(ms_swap(last.as_ref(), value));
+            Value::Array(a)
+        }
+        _ => ms_swap(expr, value),
     }
 }
 
@@ -72,7 +87,9 @@ impl Ov<'_> {
         let p = match self.body_type.as_str() { "fill" => Some("fill-color"), "line" => Some("line-color"), "circle" => Some("circle-color"), _ => None };
         for &b in &self.bodies {
             if let (Some(cb), Some(p)) = (ll.get("color_by").filter(|v| crate::roads::yes(v)), p) {
-                let v = ms_swap(layers[b]["paint"].get(p), kind_match(&cb["map"], &cb["default"]));
+                let label = ll["label"].as_str().unwrap_or_default();
+                let swap = if crate::overlays::clickable(label, if self.body_type == "line" { "line" } else { "polygon" }) { swap_in } else { ms_swap };
+                let v = swap(layers[b]["paint"].get(p), kind_match(&cb["map"], &cb["default"]));
                 layers[b]["paint"][p] = v;
             }
             if self.body_type != "line" {
