@@ -2,7 +2,7 @@
 import {POPUP, _rpairs, _rfields, _esc} from "../popup.js";
 import {map, style, O, ADAPTER, RS_PREFIX, RS_LEAN, RS_LEANS, OVERLAYS, _NO_HOVER, _role, _itemOv, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
-import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick, _lookHolds, _ovSel, _ovState} from "./overlays.js";
+import {_ovUnder, _ovUnderRoads, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick, _lookHolds, _ovSel, _ovState} from "./overlays.js";
 import {_spDotClick} from "./svproviders.js";
 import {_svLine, _svDist, _svPick, _sv, initSpot, useSpot} from "./svspot.js";
 import {_bmDrawn, _bmPickAt} from "./bridgemesh.js";
@@ -37,7 +37,10 @@ export function pick(p){
   const q = RS_LEAN ? {layers:ids, filter:_FILL_PIECE} : {layers:ids};
   let l = map.queryRenderedFeatures([p.x, p.y], q);
   if(!l.length) l = map.queryRenderedFeatures(box(p), q);
-  return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : RS_LEAN && RS_LEANS.includes(l[0].layer.id) ? _roadOfPiece(l[0]) : l[0]; }
+  if(!l.length) return null;
+  const f = ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : RS_LEAN && RS_LEANS.includes(l[0].layer.id) ? _roadOfPiece(l[0]) : l[0];
+  f.tunnel = !!(l[0].properties && l[0].properties.__rs_tunnel);   // drawn under the ground: an area on the ground ("under" overlay) wins over it
+  return f; }
 export function srcOf(f){ return f && f.layer && _role(f.layer)==="decks" ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // road table's row behind the feature id; decks keep the feature's own properties
@@ -142,8 +145,10 @@ let _tipT = 0, _cur = null;               // _cur: the road under the mouse now
 let _tip = null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
   const ho = _ovUnder && _ovUnder.ov;
-  const ovHit = ho && !ho.under && !ho.base;   // an interactive overlay under the cursor wins over the road, as for a click; an item attached to a road is its road
-  const held = _hoverHolds.size > 0, f = ovHit || held ? null : pick(_pt);
+  const ovHit = ho && !_ovUnderRoads(ho) && !ho.base;   // an interactive overlay under the cursor wins over the road, as for a click; an item attached to a road is its road
+  const held = _hoverHolds.size > 0;
+  let f = ovHit || held ? null : pick(_pt);
+  if(f && f.tunnel && ho && !ho.base) f = null;   // a tunnel under an area on the ground (a building): the area's hover, as for a click
   // a host that holds the road hover owns the cursor over its own objects (duckOSM's fixes editor: a node dot, a door dot): roadstyle writes it only for
   // an overlay item, never "" over the rest
   if(!held || ovHit) map.getCanvas().style.cursor = (f || ovHit) ? "pointer" : "";
@@ -197,6 +202,7 @@ export function initSelect(){
     // so the road card is not wiped by a trailing rs:deselect.)
     if(handleOverlayClick(e, "over")) return;
     const f = pick(e.point);
+    if(f && f.tunnel && handleOverlayClick(e, "under")) return;   // a tunnel is under the ground: an area on the ground over it (a building) wins
     if(!f){ if(!handleOverlayClick(e, "under")) rsDeselect(); return; }
     clearTimeout(_tipT); if(_tip) _tip.remove();      // the clicked road's facts go to its popup or card: its tooltip closes (it showed through the popup)
     const row = srcOf(f)==="roads" ? f.id : _deckRoad(f);   // a deck carries its road's row

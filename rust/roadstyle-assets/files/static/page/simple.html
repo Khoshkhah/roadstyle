@@ -14,7 +14,8 @@ pick = function(p){
   if(!hit.length) return own;
   const rank = f=>f.properties.r * 4294967296 + f.id;      // the style's line-sort-key
   const top = hit.reduce((a, b)=>rank(b) > rank(a) ? b : a);
-  if(top.properties.__rs_k===5) return _roadOf(top);
-  return _roadOfPiece(top);
+  const f = top.properties.__rs_k===5 ? _roadOf(top) : _roadOfPiece(top);
+  f.tunnel = !!top.properties.__rs_tunnel;                    // as the page's pick: an area on the ground over a tunnel wins (select.js)
+  return f;
 };
 </script>
