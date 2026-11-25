@@ -69,6 +69,33 @@ def test_a_hidden_overlay_has_its_own_source_and_loads_no_tile_until_it_shows(tm
     assert errors == []
 
 
+def test_a_hidden_overlay_shows_each_time_that_it_is_switched_on(tmp_path):
+    """A hidden overlay's layers leave the map when it hides and come back when it shows. A layer with no filter came back with `filter: undefined`,
+    which addLayer refuses, so the overlay showed only the first time (noise-map: hour 08 -> 09 -> 08, wall height 4 m -> 10 m -> 4 m)."""
+    import geopandas as gpd
+    from shapely.geometry import Point
+    walls = gpd.GeoDataFrame({"h": [4, 4]}, geometry=[Point(18.0005, 59.302), Point(18.0045, 59.302)], crs=4326)
+    path = tmp_path / "t.html"
+    rs.render_dashboard(_edges(), basemap="blank", overlays=[
+        rs.Overlay(_zones(), label="hour 08", popup=[], visible=False), rs.Overlay(_zones(), label="hour 09", popup=[], visible=False),
+        rs.Overlay(walls, label="wall 4 m", popup=[], visible=False), rs.Overlay(walls, label="wall 10 m", popup=[], visible=False)]).save(path)
+    shown = """l => { const ov = OVERLAYS.find(o => o.label === l);
+        return ov.layers.every(id => map.getLayer(id)) && map.queryRenderedFeatures({layers: ov.layers}).length > 0; }"""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+        try:
+            page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
+            for a, b in (("hour 08", "hour 09"), ("wall 4 m", "wall 10 m")):
+                for on, off in ((a, None), (b, a), (a, b), (b, a), (a, b)):           # each one on and off twice
+                    page.evaluate("([on, off]) => { if(off) rsSetOverlay(off, false); rsSetOverlay(on, true); }", [on, off])
+                    page.wait_for_function(f"({shown})({on!r})", timeout=20_000)
+                page.evaluate("l => rsSetOverlay(l, false)", a)
+        finally:
+            browser.close()
+    assert errors == []
+
+
 def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when_it_shows(tmp_path):
     """lazy_overlays=True: the archive and the rows of each hidden overlay are files next to the page (docs/design/tiling.md, "Overlays in files").
     While the overlay shows, the page reads tiles of the archive with range requests, and the rows the first time; a click and rsQuery read the rows."""
