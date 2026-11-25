@@ -1,7 +1,7 @@
 // The base map's layers (mapstyle's page scripts, docs/design/mapstyle_page_scripts.md): the 3D buildings and each layer's clicks,
 // tooltip and popup. Each comes from the layer's entry in roadstyle:controls.overlays (audit R7; a page's layers have no metadata):
 // its 3D layer (extrude: the layer id), its start switches (interactive, tooltip, popup_window).
-import {map, OVERLAYS, RS_PREFIX, _emit} from "./core.js";
+import {map, OVERLAYS, RS_PREFIX, _emit, _ovAsk} from "./core.js";
 import {_ownOpacity} from "./basemap.js";
 let _b3d = [], _b3dOn = false;     // the overlays with a 3D layer (ov.extrude), the switch
 // a 3D layer shows while the switch is on and its overlay (the buildings) is shown
@@ -32,6 +32,7 @@ export function rsSetInteraction(label, opts){
   if("clickable" in o) ov.interactive = !!o.clickable;
   if("tooltip" in o) ov.tooltip = o.tooltip ? (_tips[ov.label] || (ov.popup && ov.popup.length ? ov.popup : true)) : null;
   if("popup" in o) ov.popup_window = !!o.popup;
+  _ovAsk.shown(ov);                 // now clickable or with a tooltip: its rows
   _emit("rs:interactionchange", {overlay: ov.label, ...rsGetInteraction(label)});
 }
 export function rsGetInteraction(label){

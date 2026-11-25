@@ -4,7 +4,7 @@
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields, _esc} from "../popup.js";
-import {map, O, OVERLAYS, OV_ROWS, RS_PREFIX, _NO_HOVER, _role, _emit} from "./core.js";
+import {map, O, OVERLAYS, OV_ROWS, RS_PREFIX, _NO_HOVER, _role, _emit, _ovAsk} from "./core.js";
 import {getTool} from "./tools.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY, _popupHeld} from "./select.js";
@@ -27,9 +27,11 @@ const _ovRows = {};
 const _ovJson = r => { if(!r.ok) throw new Error(r.url+": HTTP "+r.status); return r.arrayBuffer().then(b => { const u = new Uint8Array(b);
   return u[0]===0x1f && u[1]===0x8b ? new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("gzip"))).json() : JSON.parse(new TextDecoder().decode(u)); }); };
 // The rows are also the overlay's features for rsQuery, rsGetProps and rsFocus (`OV_ROWS`: the row is the feature's properties, `__rs_bbox` its box).
-// The rows in a file (lazy_overlays=True) are fetched when the overlay first shows (rsSetOverlay); the rows in the page at the start.
+// The rows in the page are read at the start. The rows in a file (lazy_overlays=True) are fetched when the overlay first shows, if it has a popup,
+// a click or a tooltip (_ovNeedsRows); else at the first rsQuery, rsGetProps or rsFocus on it (core.js), which answers from the rows it has (none
+// at first). "rs:overlayrows" {overlay} tells when the rows are in (2026-11-25: a noise surface of each hour has no popup and needs no rows).
 function _ovFetch(ov){ if(ov.props && !(ov.props in _ovRows)){ _ovRows[ov.props] = undefined; fetch(ov.props).then(_ovJson).then(j=>{
-  _ovRows[ov.props] = j; OV_ROWS.set(ov.source, j.map((r, i) => ({id: i, properties: r, bbox: r.__rs_bbox}))); },
+  _ovRows[ov.props] = j; OV_ROWS.set(ov.source, j.map((r, i) => ({id: i, properties: r, bbox: r.__rs_bbox}))); _emit("rs:overlayrows", {overlay: ov.label}); },
   e=>console.error("overlay rows:", e)); } }
 const _ovInFile = ov => !!ov.props && !ov.props.startsWith("data:");
 // an item's fields: its tile properties and its row, without roadstyle's own keys (__rs_bbox, ...): the popup, the panel and rs:select show the data only
@@ -144,7 +146,7 @@ export function rsSetOverlay(labelOrIdx, on){
   else { if(_ovHov && _ovHov.ov === ov){ _ovState(_ovHov, {hover:false}); _ovHov = null; if(_ovTip) _ovTip.remove(); } _ovHovLayers(ov).forEach(_ovUnbind); }
   _ovAllLayers(ov).forEach(id=>map.setLayoutProperty(id,"visibility", on?"visible":"none"));
   ov.visible = !!on;
-  if(on) _ovFetch(ov);
+  if(on && _ovNeedsRows(ov)) _ovFetch(ov);
   on ? _ovOff.delete(ov.label) : _ovOff.add(ov.label);
   if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;
   _emit("rs:overlaychange", {overlay:ov.label, visible:!!on});
@@ -168,10 +170,14 @@ const _ovTipFn = {};
 export function rsSetTooltip(label, fn){
   if(fn != null && typeof fn !== "function") throw new Error("rs.tooltip: give a function of the feature's properties, or null");
   if(fn == null) delete _ovTipFn[label]; else _ovTipFn[label] = fn;
+  const ov = OVERLAYS.find(o => o.label === label); if(ov) _ovAsk.shown(ov);
 }
 const _ovTipHtml = t => [t.title != null && t.title !== "" ? "<b>" + _esc(t.title) + "</b>" : null,
                          ...(t.rows || []).map(([k, v]) => "<b>" + _esc(k) + "</b>: " + _esc(v))].filter(Boolean).join("<br>");
 const _ovTips = ov=>!!_ovTipFn[ov.label] || ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   // true: every field (rsSetInteraction, a layer with no list)
+const _ovNeedsRows = ov => !!ov.interactive || !!_ovTips(ov);
+_ovAsk.fetch = _ovFetch;
+_ovAsk.shown = ov => { if(ov.visible !== false && _ovNeedsRows(ov)) _ovFetch(ov); };
 function _ovBind(id){
   if(_ovBound.has(id)) return;
   const move = e=>{ if(_NO_HOVER.matches) return; const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov)) || !_ovPickLayers(ov).includes(id)) return;
@@ -232,7 +238,7 @@ export function useOverlays(){
   _ovLazyCalls();
   clearOvSel(); _ovHov = null; _ovUnder = null;
   if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
-  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(ov.visible0 || !_ovInFile(ov)) _ovFetch(ov); if(ov.visible0) _ovHovLayers(ov).forEach(_ovBind); if((_ovGroupOff && _ovGroup().includes(ov)) || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
+  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; if(!_ovInFile(ov) || (ov.visible0 && _ovNeedsRows(ov))) _ovFetch(ov); if(ov.visible0) _ovHovLayers(ov).forEach(_ovBind); if((_ovGroupOff && _ovGroup().includes(ov)) || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
   window.RS_OVERLAYS = OVERLAYS;
   _ovBoxRows();
   _emit("rs:overlayschange", {visible: rsGetOverlays()});       // the base-map box and the legend box read the layers again

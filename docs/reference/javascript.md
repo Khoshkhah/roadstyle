@@ -91,7 +91,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | function | does | fires |
 |---|---|---|
 | **Query and act on id sets** | | |
-| `rsQuery(p => bool, layer?)` | the ids of the features whose properties match. An overlay in tiles (a one-file page) reads its rows, which hold all its properties; a page of the map worker has no rows for it and gets an empty list | |
+| `rsQuery(p => bool, layer?)` | the ids of the features whose properties match. An overlay in tiles (a one-file page) reads its rows, which hold all its properties; a page of the map worker has no rows for it and gets an empty list. With `lazy_overlays=True`, the rows of an overlay can be in a file that is not read yet: the call answers from the rows that the page has (none at first) and starts to read the file (also `rsGetProps` and `rsFocus`) | `rs:overlayrows` when the rows are in |
 | `rsGetProps(ids, layer?)` | the rows behind the ids, internal fields removed | |
 | `rsFilter(ids, layer?)` | show only these features; `null` resets. On roads it combines with the class, bridge and tunnel filters and hides every piece and every attached item (`Overlay(edge_col=...)`) of the other roads; on an overlay attached to edges it combines with its roads' filters and keeps each layer's position and order | `rs:filterchange` |
 | `rsColor(ids, "#hex", layer?)` | paint the set one colour over the base colours, and draw it on top of the other roads on its level | `rs:colorchange` |
@@ -185,6 +185,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:basemapchange` | `rsSetBasemap` | `basemap` (key), `index` |
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
 | `rs:interactionchange` | `rsSetInteraction` | `overlay` (label), `clickable`, `tooltip`, `popup` |
+| `rs:overlayrows` | the rows of an overlay are in the page (`lazy_overlays=True`: when it first shows with a popup, a click or a tooltip, or at the first `rsQuery`, `rsGetProps` or `rsFocus` on it). Ask again then | `overlay` (label) |
 | `rs:buildings3dchange` | `rsSetBuildings3D` | `on` |
 | `rs:arrowschange` | `rsSetArrows`, the row "One-way arrows" of the base-map box | `on` |
 | `rs:toprowschange` | your page, when it changes the state of a row of `rsAddTopRow` (the base-map box reads the row again) | none |

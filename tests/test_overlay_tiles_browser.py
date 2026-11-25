@@ -96,6 +96,23 @@ def test_a_hidden_overlay_shows_each_time_that_it_is_switched_on(tmp_path):
     assert errors == []
 
 
+def _serve(page, folder, asked, ranges):
+    """The page and its files at an http address that answers range requests, as a file host does."""
+    def serve(route):
+        name = route.request.url.split("//rs.test/", 1)[1]
+        asked.append(name)
+        body, r = (folder / name).read_bytes(), route.request.headers.get("range")
+        if r:
+            ranges.append(name)
+            a, b = map(int, r.removeprefix("bytes=").split("-"))
+            part = body[a:b + 1]
+            route.fulfill(status=206, body=part, headers={"Content-Range": f"bytes {a}-{a + len(part) - 1}/{len(body)}",
+                                                          "Content-Length": str(len(part)), "Content-Type": "application/octet-stream"})
+        else:
+            route.fulfill(body=body, content_type="text/html" if name.endswith(".html") else "application/gzip")
+    page.route("http://rs.test/**", serve)
+
+
 def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when_it_shows(tmp_path):
     """lazy_overlays=True: the archive and the rows of each hidden overlay are files next to the page (docs/design/tiling.md, "Overlays in files").
     While the overlay shows, the page reads tiles of the archive with range requests, and the rows the first time; a click and rsQuery read the rows."""
@@ -114,19 +131,7 @@ def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
 
-        def serve(route):                       # the page and its files at an http address that answers range requests, as a file host does
-            name = route.request.url.split("//rs.test/", 1)[1]
-            asked.append(name)
-            body, r = (tmp_path / name).read_bytes(), route.request.headers.get("range")
-            if r:
-                ranges.append(name)
-                a, b = map(int, r.removeprefix("bytes=").split("-"))
-                part = body[a:b + 1]
-                route.fulfill(status=206, body=part, headers={"Content-Range": f"bytes {a}-{a + len(part) - 1}/{len(body)}",
-                                                              "Content-Length": str(len(part)), "Content-Type": "application/octet-stream"})
-            else:
-                route.fulfill(body=body, content_type="text/html" if name.endswith(".html") else "application/gzip")
-        page.route("http://rs.test/**", serve)
+        _serve(page, tmp_path, asked, ranges)
         # the cache of each range read: Chrome locks its HTTP cache for each URL, so with the cache on, the reads of one file go one after the other
         page.add_init_script("""const f0 = fetch; window.__caches = [];
             window.fetch = (u, o) => { if(String(u).endsWith('.pmtiles')) __caches.push(o && o.cache); return f0(u, o); };""")
@@ -152,6 +157,39 @@ def test_lazy_overlays_keep_the_data_of_a_hidden_overlay_in_files_that_load_when
     assert errors == []
     assert len(m.html) < len(rs.render_dashboard(_edges(), basemap="blank", overlays=[
         rs.Overlay(_zones(), kind="fill", label="zones", popup=["zone"]), rs.Overlay(_zones(), kind="fill", label="hidden", popup=["zone"], visible=False)]).html)
+
+
+def test_an_overlay_with_no_popup_loads_its_rows_only_when_a_call_asks(tmp_path):
+    """lazy_overlays=True: an overlay with no popup, click or tooltip (a noise surface of one hour) reads no rows file when it shows. The first
+    rsGetProps on it answers from the rows that it has (none), fetches them, and "rs:overlayrows" tells when they are in."""
+    path = tmp_path / "s.html"
+    m = rs.render_dashboard(_edges(), basemap="blank", lazy_overlays=True,
+                            overlays=[rs.Overlay(_zones(), kind="fill", label="surface", popup=[], visible=False)])
+    m.save(path)
+    asked, ranges = [], []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        _serve(page, tmp_path, asked, ranges)
+        try:
+            page.goto("http://rs.test/s.html")
+            page.wait_for_function("window.map && window.map.loaded() && map.areTilesLoaded()", timeout=60_000)
+            page.evaluate("rsSetOverlay('surface', true)")
+            page.wait_for_function("map.querySourceFeatures('ov0', {sourceLayer: 'ov0'}).length > 0", timeout=20_000)
+            page.wait_for_function("map.areTilesLoaded()", timeout=20_000)
+            assert any(a.endswith(".pmtiles") and "/ov0-" in a for a in asked)
+            assert not [a for a in asked if a.endswith(".json.gz")], asked                    # shown, and no rows file
+            page.evaluate("document.addEventListener('rs:overlayrows', e => { window.__rows = e.detail; })")
+            assert page.evaluate("rsGetProps([0], 'surface')") == [{}]                        # the rows that it has: none yet
+            page.wait_for_function("window.__rows", timeout=20_000)
+            assert page.evaluate("window.__rows") == {"overlay": "surface"}
+            assert [a for a in asked if a.endswith(".json.gz")]
+            assert page.evaluate("rsGetProps([0, 2], 'surface')") == [{"zone": "a", "owner": "x"}, {"zone": "a", "owner": "z"}]
+        finally:
+            browser.close()
+    assert errors == []
 
 
 def test_lazy_overlays_need_tiles():
