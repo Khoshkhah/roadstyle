@@ -8,12 +8,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "reference" / "contract.md"
-# a name with a number in it is one row: __rs_fill__1 is __rs_fill__<i>, rs_ov_ (the code joins the number) is rs_ov_<i>
+# a name with a number in it is one row: __rs_fill__1 is __rs_fill__<i>
 KINDS = {"state": r"\brs_[a-z0-9_]+", "property": r"__rs_[A-Za-z0-9_]+", "metadata": r"roadstyle:[a-z_]+", "placeholder": r"__[A-Z][A-Z0-9_]+__"}
 
 
 def _norm(n):
-    return re.sub(r"^(__rs_fill__)\d+$", r"\1<i>", re.sub(r"^rs_ov_$", "rs_ov_<i>", n))
+    return re.sub(r"^(__rs_fill__)\d+$", r"\1<i>", n)
 
 
 def _code_names():
@@ -22,7 +22,7 @@ def _code_names():
     files += [p for p in (ROOT / "rust").rglob("*.rs") if "target" not in p.parts]
     for p in files:
         text = p.read_text(errors="ignore")
-        out["state"] |= {_norm(m) for m in re.findall(r'"(rs_[a-z0-9_]+)"|(rs_ov_)', text) for m in m if m}
+        out["state"] |= {_norm(m) for m in re.findall(r'"(rs_[a-z0-9_]+)"', text)}
         out["property"] |= {_norm(m) for m in re.findall(KINDS["property"], text)}
         out["metadata"] |= set(re.findall(KINDS["metadata"], text))
     out["placeholder"] = set(re.findall(KINDS["placeholder"], (ROOT / "rust/roadstyle-assets/files/static/web_template.html").read_text()))

@@ -38,6 +38,34 @@ def test_an_overlay_is_a_tile_layer_and_the_dashboard_reads_its_rows(tmp_path):
     assert errors == []
 
 
+def test_rscolor_paints_an_overlay_with_feature_state_and_the_page_has_no_state_for_each_overlay(tmp_path):
+    """rsColor(ids, color, overlay) sets the feature state rs_c of the overlay's features. The global state has no key for each overlay: MapLibre
+    copies the whole global state into each tile that a worker sends (docs/design/tile_speed.md). A hidden overlay gets its colours when it shows."""
+    from test_bridge_mesh_browser import _pixel
+    path = tmp_path / "c.html"
+    rs.render_dashboard(_edges(), basemap="blank", overlays=[rs.Overlay(_zones(), kind="fill", label="zones"),
+                                                             rs.Overlay(_zones(), kind="fill", label="hidden", visible=False)]).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            assert not [k for k in page.evaluate("Object.keys(map.getGlobalState())") if k.startswith("rs_ov")]
+            page.evaluate("rsColor([1], '#ff0000', 'zones'); rsColor([2], '#00ff00', 'hidden')")
+            assert page.evaluate("map.getFeatureState({source: 'roads', sourceLayer: 'ov0', id: 1})") == {"rs_c": "#ff0000"}
+            page.wait_for_function("map.areTilesLoaded() && !map.isMoving()", timeout=20_000)
+            page.wait_for_timeout(300)
+            x, y = page.evaluate("(() => { const q = map.project([18.0025, 59.302]); return [q.x, q.y]; })()")
+            r, g, b = _pixel(page.screenshot(), x, y)
+            assert r - max(g, b) > 30, (r, g, b)                                              # the zone of id 1 is red (at the fill's opacity)
+            page.evaluate("rsSetOverlay('hidden', true)")
+            page.wait_for_function("map.querySourceFeatures('ov1', {sourceLayer: 'ov1'}).length > 0", timeout=20_000)
+            assert page.evaluate("map.getFeatureState({source: 'ov1', sourceLayer: 'ov1', id: 2})") == {"rs_c": "#00ff00"}
+            page.evaluate("rsColor(null, null, 'zones')")
+            assert page.evaluate("map.getFeatureState({source: 'roads', sourceLayer: 'ov0', id: 1})") == {}
+        finally:
+            browser.close()
+    assert errors == []
+
+
 def test_a_hidden_overlay_has_its_own_source_and_loads_no_tile_until_it_shows(tmp_path):
     """An overlay that starts hidden is a vector source of its own with its own archive (docs/design/tiling.md): MapLibre asks for a source's tiles
     only while one of its layers shows, so a hidden overlay costs a map move nothing. Shown, it draws, and a click selects it. An overlay that

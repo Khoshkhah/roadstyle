@@ -1,8 +1,9 @@
 // "colour by" recolouring: each option's fill is baked per edge (__rs_fill / __rs_fill__1 …), and the road layers' expressions (made
 // in Python, render_web._fill_expr) pick the active option from the state rs_co. window.rsSetColorField sets it from your UI.
-import {map, O, OVERLAYS, RS_LEAN, RoadTable, _lyr, _src, _emit, _role} from "./core.js";
+import {map, O, RS_LEAN, RoadTable, _lyr, _src, _emit, _role} from "./core.js";
 import {_tlHost} from "./panel.js";
 import {coUpdateLegend} from "./legend.js";
+import {_ovColor, _ovColorsAgain} from "./overlays.js";
 export let COLOR_OPTIONS = [];
 export let _coActive = 0;
 let _qColor=null;   // [{ids, color}, ...] the rsColor groups, for the rs:colorchange event
@@ -33,12 +34,6 @@ function _applyC(all){
 }
 // live.js: the live data's colours by row (null: none)
 export function setLiveColors(byRow){ _by.live = byRow || new Map(); _applyC(); }
-// the full look's state of rsColor: {edge id: colour}; an earlier group wins where groups share ids
-function _colorsOf(groups){
-  const out={};
-  for(let i=(groups||[]).length-1;i>=0;i--) for(const id of groups[i].ids) out[String(id)]=groups[i].color;
-  return out;
-}
 export function rsSetColorField(nameOrIdx){
   let idx = typeof nameOrIdx==="number" ? nameOrIdx : COLOR_OPTIONS.map(o=>o.name).indexOf(nameOrIdx);
   const o = COLOR_OPTIONS[idx]; if(!o) return;
@@ -50,8 +45,8 @@ export function rsSetColorField(nameOrIdx){
 }
 export function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(null) resets
   const L=_lyr(layer); if(!L) return;
-  if(L.ov){      // an overlay's colours: its state rs_ov_<n>, which its layers read (render_web._state_expressions)
-    map.setGlobalStateProperty("rs_ov_"+OVERLAYS.indexOf(L.ov), ids!=null && color ? _colorsOf([{ids:Array.from(ids), color:color}]) : {});
+  if(L.ov){      // an overlay's colours: the feature state rs_c of its features (overlays.js _ovColor)
+    _ovColor(L.ov, ids!=null && color ? Array.from(ids) : null, color);
     _emit("rs:colorchange", {overlay:L.ov.label, ids:ids==null?null:Array.from(ids), color:color||null});
     return;
   }
@@ -119,6 +114,7 @@ export function useColor(){
   if(_coBox && w) _coBox.replaceWith(w); else if(_coBox) _coBox.remove(); else if(w) _tlHost().prepend(w);   // colour-by sits above the filter in the stack
   _coBox = w;
   if(RS_LEAN && _cNow.size) _applyC(true);   // a new style has new sources, with no feature state
+  _ovColorsAgain();
 }
 export function initColor(){
   window.rsColorBase = rsColorBase;
