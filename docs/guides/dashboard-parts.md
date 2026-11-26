@@ -975,7 +975,7 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
 
 <iframe class="rs-live" src="../../parts/gallery.html?part=chart" title="A chart, live" loading="lazy"></iframe>
 
-**Use it for:** a chart of rows: bar, line, histogram, scatter or pie.<br>
+**Use it for:** a chart of rows: bar, line, histogram, scatter, pie or heatmap.<br>
 **From Python:** yes
 { .rs-facts }
 
@@ -1004,10 +1004,39 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
     | `histogram` | a number column | none | the rows in 20 equal ranges |
     | `scatter` | a number column | a number column | one point for each row, at most 5000 |
     | `pie` | labels | one number column of 0 or more | at most 6 slices; the rest is "Other" |
+    | `heatmap` | the columns of the grid | the rows of the grid (one column) | one cell for each row, coloured by the class of `z` |
 
     - The series colours are `--rs-chart-1` to `--rs-chart-8`, checked for colour vision deficiency in both themes.
     - `title` (or `false`), `count`, `small`, `head`; `set(change)`, `spec()`, `svg()`, `destroy()`.
     - The pointer on a mark shows its values. A click calls `onPick(row)`.
+    - `y_range` (line, bar): `"data"` fits the y axis to the values (a line only; a bar always starts at 0). `[lo, hi]` makes the y axis cover at least `lo` to `hi` (`null`: that end fits the values). The axis always covers every value, and its ends are nice ticks. With no `y_range`, the axis starts at 0.
+
+    **A heatmap**
+
+    A heatmap is a grid of cells: a column for each value of `x`, a row for each value of `y`. Each row of the data is one cell, and `z` is its number. A cell has the colour of the class of its value. A `null` value has no cell.
+
+    ```js
+    rs.chart(el, {kind: "heatmap", x: "place", y: "height", z: "dB", group: "wall",
+      columns: [{name: "place", type: "BIGINT"}, {name: "height", type: "DOUBLE"}, {name: "wall", type: "VARCHAR"}, {name: "dB", type: "DOUBLE"}],
+      rows: [[0, 1.5, "front · S", 62.4], [0, 4.5, "front · S", 61.8] /* , ... */],
+      breaks: [45, 50, 55, 60, 65, 70, 75],
+      colors: ["#cfe8c8", "#9fd28f", "#e6e36b", "#f5c242", "#ef8f3a", "#e2522f", "#b8262b", "#6e1a1f"],
+      mark: [{x: 12, y: 4.5}], onPick: (i) => console.log("row", i)});
+    ```
+
+    | Option | Default | What it is |
+    |---|---|---|
+    | `z` | (necessary) | The number column of the cells |
+    | `group` | none | A column that puts the columns of the grid in groups. Each group has a gap before it and its name under it |
+    | `breaks` | 5 classes of the values | The class limits, in ascending order. A value `v` is in class `n`, where `n` is the number of limits that are `v` or less |
+    | `colors` | the first chart colour, from light to full | One colour for each class: one more colour than `breaks` |
+    | `mark` | none | A frame on a cell `{x, y}`, a column `{x}` or a row `{y}`, or a list of them. With `group`, `{x, group}` is the column of that group |
+
+    - Numbers go in order: the columns from left to right, the rows from the bottom up. Text goes in the order of the rows.
+    - A cell shows its value when the value fits in the cell. The pointer on a cell shows its row, its column and its value.
+    - The legend shows the classes: `< 45`, `45–50`, …, `≥ 75`.
+    - A column is at least 6 px wide. A grid that is wider than its box scrolls to the side, and the row labels stay. A row is at least 10 px high.
+    - A click on a cell calls `onPick(row)`. To move the frame to the cell, call `set({mark: ...})`.
 
     **A chart card from Python**
 
@@ -1032,15 +1061,17 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
 
     | Option | Default | What it is |
     |---|---|---|
-    | `kind` | (necessary) | `bar`, `line`, `histogram`, `scatter` or `pie` |
-    | `x` | (necessary) | A column: the groups (bar, pie), the order (line), the numbers (histogram, scatter) |
-    | `y` | none | A number column, or a list of up to 3 (bar, line). None: the count of rows. A histogram has no `y`. A scatter needs one |
+    | `kind` | (necessary) | `bar`, `line`, `histogram`, `scatter`, `pie` or `heatmap` |
+    | `x` | (necessary) | A column: the groups (bar, pie), the order (line), the numbers (histogram, scatter), the columns of the grid (heatmap) |
+    | `y` | none | A number column, or a list of up to 3 (bar, line). None: the count of rows. A histogram has no `y`. A scatter needs one. A heatmap needs one column: the rows of its grid |
     | `agg` | `"sum"` | How the rows of one value of `x` join: `sum`, `mean`, `min`, `max` or `count` |
     | `scale` | `1` | A factor for the values of `y` (`0.001`: metres to km) |
     | `data` | none: the map's roads | Your own rows. Python: a pandas DataFrame, a GeoDataFrame (its geometry is not used) or a list of dicts. JavaScript: `{columns, rows}` or a list of objects. The rows are written into the page |
     | `title` | the card's `label` | The title of the chart. A card with a `label` shows no second title |
     | `height` | `220` | The height of the chart in pixels (80 or more) |
     | `follow` | `false` | The map's roads only: `true` draws the chart again for the roads that the map shows now |
+    | `y_range` | none: from 0 | Line, bar: `"data"` (a line only) or `[lo, hi]`, as for `rs.chart` |
+    | `z`, `group`, `breaks`, `colors`, `mark` | | Heatmap only, as for `rs.chart`. A heatmap needs `data` (one row for each cell) |
 
     The section has the keys of each card: `label`, `fold`, `note`, `background`, `after` and `before` ([Dashboards](dashboards.md#the-panel-starts-empty)).
 
@@ -1060,6 +1091,7 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
     **A click**
 
     - **The map's roads.** A click on a bar, a slice or a point lights its roads on the map, in the colour of the mark (the highlight set `chart`). A second click on the same mark ends the light. A click on another mark moves the light.
+    - **A heatmap.** A click on a cell sends `rs:chartpick` with the values of its row (`{hour: 8, height: 4.5, dB: 61.2}`), and puts a frame on the cell. The frames of a column or a row of `mark` stay.
     - **Your own rows.** A click sends the event `rs:chartpick` with `{id, row, rows}`: the id of the section, the values of the mark (`{hour: 7, vehicles: 820}`) and the indices of the rows of `data` in it. A page can act on it:
 
     ```js
@@ -1074,6 +1106,7 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
     - `y` for a histogram, no `y` for a scatter, more than one `y` for a pie or a scatter, or more than 3;
     - a column of `x` or `y` that is not in `data`;
     - `follow` with `data`;
+    - a heatmap with no `y`, `z` or `data`; `breaks` that do not go up; `colors` that are not one more than `breaks`; `z`, `group`, `breaks`, `colors` or `mark` on another kind; `y_range` on a kind that is not a line or a bar;
     - `chart` on a section that is not `part: "chart"`, or `part: "chart"` with no `chart`.
 
 ??? info "One chart of each kind"

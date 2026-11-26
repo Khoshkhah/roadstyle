@@ -1,13 +1,13 @@
 // The part "chart" (docs/guides/dashboard-parts.md, "A chart"): a chart in a card of the panel, with no JavaScript of the page. A page adds it with `{id, part: "chart",
-// chart: {kind, x, y, agg, scale, data, title, height, follow}}`. With no `data`, the rows are the map's own road table (x and y are road columns);
+// chart: {kind, x, y, agg, scale, data, title, height, follow, y_range}}` (a heatmap: {kind: "heatmap", x, y, z, group, breaks, colors, mark, data}). With no `data`, the rows are the map's own road table (x and y are road columns);
 // with `data`, they are the page's own rows ({columns, rows}, or a list of objects). A bar, a line or a pie joins the rows of each value of x with
 // `agg` (with no y: the count of rows); a number x with more than 40 values goes in ranges, as in the data dock (rs.chart.ranges). rs.chart draws it.
 // A click on a mark of the map's roads lights its roads (the highlight set "chart"), a second click ends the light; with `data`, a click sends
-// rs:chartpick {id, row, rows}. `follow: true` draws the chart again for the roads that the map shows now (rs:filterchange).
+// rs:chartpick {id, row, rows}; a click on a cell of a heatmap also marks the cell. `follow: true` draws the chart again for the roads that the map shows now (rs:filterchange).
 import {RoadTable, _emit} from "./core.js";
 import {rsChart} from "./chart.js";
 import {_roadTest} from "./filter.js";
-const _CC_KINDS = ["bar", "line", "histogram", "scatter", "pie"], _CC_AGGS = ["sum", "mean", "min", "max", "count"];
+const _CC_KINDS = ["bar", "line", "histogram", "scatter", "pie", "heatmap"], _CC_AGGS = ["sum", "mean", "min", "max", "count"];
 const _CC_LIGHT = "chart";
 // the type of a column of plain values: the first value that is not null tells it ("2026-06-01": a date, "2026-06-01 08:00": a time)
 function _ccType(rows, j){
@@ -29,6 +29,7 @@ function _ccTable(data){
 function _ccDrawn(c, cols, rows, roads){
   const ys = [].concat(c.y ?? []), at = n => cols.findIndex(k => k.name === n), xi = at(c.x), yi = ys.map(at), k = c.scale ?? 1;
   if(xi < 0 || yi.some(i => i < 0) || c.kind === "histogram") return {columns: cols, rows, members: null};     // (rs.chart says what is wrong)
+  if(c.kind === "heatmap") return {columns: cols, rows, members: rows.map((r, i) => [i])};                      // a cell is a row: no groups
   const num = v => v == null || v === "" ? null : isFinite(+v) ? +v : null;
   if(c.kind === "scatter") return {columns: [cols[xi], {name: ys[0], type: "DOUBLE"}], rows: rows.map(r => [r[xi], num(r[yi[0]]) == null ? null : num(r[yi[0]]) * k]),
                                    members: rows.map((r, i) => [i])};
@@ -59,7 +60,8 @@ export function chartCardPart(spec){
   const c = spec.chart || {};
   const bad = !_CC_KINDS.includes(c.kind) ? "chart.kind is one of " + _CC_KINDS.join(", ") : !c.x ? "chart.x (a column) is necessary"
     : c.kind === "histogram" && c.y != null ? "a histogram has no chart.y" : c.agg != null && !_CC_AGGS.includes(c.agg) ? "chart.agg is one of " + _CC_AGGS.join(", ")
-    : c.follow && c.data != null ? "chart.follow is for the map's roads, not for chart.data" : null;
+    : c.follow && c.data != null ? "chart.follow is for the map's roads, not for chart.data"
+    : c.kind === "heatmap" && c.data == null ? "a heatmap needs chart.data (a row for each cell)" : c.kind === "heatmap" && !c.z ? "a heatmap needs chart.z (a number column)" : null;
   if(bad) throw new Error("rs.sections.add: '" + spec.id + "': " + bad);
   const own = c.data != null ? _ccTable(c.data) : null;
   const el = document.createElement("div"); el.className = "rs-chart-card"; el.style.height = (c.height || 220) + "px";
@@ -77,6 +79,8 @@ export function chartCardPart(spec){
   const pick = i => {
     if(!drawn.members) return;
     if(own){ const row = Object.fromEntries(drawn.columns.map((k, j) => [k.name, drawn.rows[i][j]]));
+      if(c.kind === "heatmap"){ const m = [].concat(chart.spec().mark || []).filter(k => k.x == null || k.y == null);        // the page's column and row marks stay
+        chart.set({mark: m.concat([{x: row[c.x], y: row[c.y], ...(c.group != null ? {group: row[c.group]} : {})}])}); }
       _emit("rs:chartpick", {id: spec.id, row, rows: drawn.members[i].slice()}); return; }
     light(lit === i ? -1 : i, colourOf(i));
   };
@@ -93,8 +97,9 @@ export function chartCardPart(spec){
     drawn = _ccDrawn(c, cols, rows, own ? null : roads);
     const s = {kind: c.kind, x: c.x, y: drawn.columns.slice(1).map(k => k.name), columns: drawn.columns, rows: drawn.rows, values: null,
                title: c.title || (spec.label ? false : undefined), onPick: drawn.members ? pick : null,
-               count: rows.length.toLocaleString("en").replace(/,/g, " ") + (own ? " rows" : " roads")};      // the source's rows, not the groups
+               count: rows.length.toLocaleString("en").replace(/,/g, " ") + (own ? " rows" : " roads"), y_range: c.y_range};      // the source's rows, not the groups
     if(c.kind === "histogram"){ s.y = undefined; }
+    else if(c.kind === "heatmap") Object.assign(s, {y: c.y, z: c.z, group: c.group, breaks: c.breaks, colors: c.colors, mark: chart ? chart.spec().mark : c.mark});
     else if(s.y.length === 1) s.y = s.y[0];
     chart ? chart.set(s) : (chart = rsChart(el, s));
   };

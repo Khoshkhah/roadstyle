@@ -311,3 +311,76 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         assert page.is_visible("#rs-dock .rs-dock-table")
         browser.close()
     assert errors == [], errors
+
+
+_DB = [45, 50, 55, 60, 65, 70, 75]
+_DBC = ["#cfe8c8", "#9fd28f", "#e6e36b", "#f5c242", "#ef8f3a", "#e2522f", "#b8262b", "#6e1a1f"]
+_HEAT = """([w, n, extra]) => { const el = document.createElement('div'); el.id = 'c'; el.style.cssText = `width:${w}px;height:300px`;
+  document.getElementById('sb').querySelector('.sb-body').prepend(el);
+  const rows = []; for(let p = 0; p < n; p++) for(let h = 0; h < 6; h++) rows.push([p, 1.5 + 3 * h, p < n / 2 ? 'front' : 'back', h === 5 && p === 0 ? null : 42 + p % 9 * 4 + h]);
+  window.picked = []; window.C = rs.chart(el, {kind: 'heatmap', x: 'place', y: 'height', z: 'dB', group: 'wall', rows, onPick: i => picked.push(i),
+    columns: [{name: 'place', type: 'BIGINT'}, {name: 'height', type: 'DOUBLE'}, {name: 'wall', type: 'VARCHAR'}, {name: 'dB', type: 'DOUBLE'}], ...extra}); }"""
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_a_heatmap_colours_each_cell_by_its_class_and_a_click_gives_its_row(tmp_path, theme):
+    """The façade of a building (noise-map, 2026-11-25): places along two walls by heights, 5 dB classes with the page's colours, a null value has no
+    cell, the lowest height is the bottom row, a group name under each wall, a value in a cell that is wide enough, the marks and a click."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(f"rsSetTheme('{theme}')")
+            page.evaluate(_HEAT, [360, 8, {"breaks": _DB, "colors": _DBC, "mark": [{"x": 3, "y": 4.5}, {"x": 5}]}])
+            page.wait_for_timeout(80)
+            m = page.evaluate("""() => { const s = C.svg(), cells = [...s.querySelectorAll('rect[data-i]')], at = (p, h) => cells.find(c => { const r = C.spec().rows[+c.dataset.i]; return r[0] === p && r[1] === h; });
+              return {cells: cells.length, fill: at(0, 1.5).getAttribute('fill'), low: +at(0, 1.5).getAttribute('y') > +at(0, 4.5).getAttribute('y'),
+                      text: [...s.querySelectorAll('text')].map(t => t.textContent), marks: s.querySelectorAll('.rs-chart-mark').length,
+                      legend: document.querySelector('#c .rs-chart-legend').innerText, wide: s.getBoundingClientRect().width <= document.getElementById('c').clientWidth}; }""")
+            assert m["cells"] == 8 * 6 - 1 and m["fill"] == "#cfe8c8" and m["low"], m          # 42 dB: under 45
+            assert "front" in m["text"] and "back" in m["text"] and "43" in m["text"], m["text"]
+            assert m["marks"] == 2 and m["wide"] and "< 45" in m["legend"] and "≥ 75" in m["legend"], m
+            page.locator("#c svg rect[data-i]").first.click()
+            assert len(page.evaluate("picked")) == 1
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_wide_heatmap_scrolls_to_the_side_and_keeps_its_row_labels(tmp_path):
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(_HEAT, [300, 90, {}])
+            page.wait_for_timeout(80)
+            m = page.evaluate("""() => { const sc = document.querySelector('#c .rs-chart-hscroll'); sc.scrollLeft = 200;
+              return {wider: sc.scrollWidth > sc.clientWidth + 50, moved: sc.scrollLeft > 0, labels: document.querySelector('#c .rs-chart-hm > svg').querySelectorAll('text').length,
+                      page: document.getElementById('c').scrollWidth <= document.getElementById('c').clientWidth + 1}; }""")
+            assert m["wider"] and m["moved"] and m["labels"] >= 3 and m["page"], m
+            page.evaluate("C.set({mark: {x: 50}})")                      # a new draw keeps the side scroll
+            assert page.evaluate("document.querySelector('#c .rs-chart-hscroll').scrollLeft") > 0
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_y_range_fits_the_axis_to_the_values(tmp_path):
+    """Sound levels of 40 to 75 dB (noise-map, 2026-11-25): with y_range "data" the y axis starts near the values, not at 0; [30, null] covers at least 30;
+    a bar always starts at 0."""
+    cols = [{"name": "hour", "type": "BIGINT"}, {"name": "dB", "type": "DOUBLE"}]
+    rows = [[h, 48 + h % 12 * 2.1] for h in range(24)]
+    lowest = "() => Math.min(...[...C.svg().querySelectorAll('text')].filter(t => t.getAttribute('text-anchor') === 'end').map(t => +t.textContent))"
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(_DRAW, ["line", "hour", "dB", cols, rows, 400])
+            assert page.evaluate(lowest) == 0
+            page.evaluate("C.set({y_range: 'data'})")
+            assert 40 <= page.evaluate(lowest) <= 48
+            page.evaluate("C.set({y_range: [30, null]})")
+            assert page.evaluate(lowest) == 30
+            page.evaluate("C.set({kind: 'bar', x: 'hour', y_range: 'data'})")
+            assert page.evaluate(lowest) == 0
+            assert page.evaluate(_INSIDE)["out"] == 0
+        finally:
+            browser.close()
+    assert errors == [], errors

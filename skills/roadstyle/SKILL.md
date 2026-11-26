@@ -138,7 +138,7 @@ Fit the content to the panel (its width is `panel.width_px`: "Dashboard options"
 
 Use these parts. Never draw a chart with your own SVG code, and never make your own table under the map.
 
-- **A chart: `rs.chart(el, spec)`** draws `bar`, `line`, `histogram`, `scatter` or `pie` from `{columns: [{name, type}], rows}` (a
+- **A chart: `rs.chart(el, spec)`** draws `bar`, `line`, `histogram`, `scatter`, `pie` or `heatmap` (`z`, `breaks`, `colors`, `group`, `mark`; `y_range: "data"` fits a line's y axis) from `{columns: [{name, type}], rows}` (a
   value is a string, number, `BigInt` or `null`), with `x`, `y` (a column, or a list of up to 3), `title`, `onPick(row)`. It has the 8
   chart colours (`--rs-chart-1..8`, teal first, checked for colour vision deficiency in both themes), compact ticks, hover, a legend for 2
   or more series, and the light and the dark theme. `c.set({kind: "pie"})` draws again. A spec that does not fit the columns shows a line

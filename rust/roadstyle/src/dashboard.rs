@@ -65,6 +65,36 @@ pub enum ChartKind {
     Histogram,
     Scatter,
     Pie,
+    /// a grid of cells: a column for each value of `x`, a row for each value of `y`, each cell coloured by the class of `z`
+    Heatmap,
+}
+
+/// `y_range` of a line or a bar chart: `"data"` (the y axis fits the values; a line only) or `[lo, hi]` (the y axis covers at least lo to hi; null: that
+/// end fits the values). None: the y axis starts at 0.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum YRange {
+    Fit(YFit),
+    Ends([Option<f64>; 2]),
+}
+
+/// The one word of `y_range`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum YFit {
+    Data,
+}
+
+/// A frame on a heatmap: a cell (`x` and `y`), a column (`x`) or a row (`y`); with `group`, the column of that group.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HeatMark {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<Value>,
 }
 
 /// How the rows of one value of `x` join into one value of the chart.
@@ -136,6 +166,31 @@ pub struct ChartSpec {
     /// the map's roads only: draw again for the roads that the map shows now
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub follow: bool,
+    /// line, bar: the range of the y axis; none: from 0
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y_range: Option<YRange>,
+    /// heatmap: the number column of the cells
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub z: Option<String>,
+    /// heatmap: a column that puts the columns of the grid in groups
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// heatmap: the ascending class limits; none: 5 classes of the values
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breaks: Option<Vec<f64>>,
+    /// heatmap: one more colour than `breaks`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colors: Option<Vec<String>>,
+    /// heatmap: the cells, columns or rows with a frame
+    #[serde(default, skip_serializing_if = "Vec::is_empty", deserialize_with = "one_or_many")]
+    pub mark: Vec<HeatMark>,
+}
+
+fn one_or_many<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<HeatMark>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum M { One(HeatMark), Many(Vec<HeatMark>) }
+    Ok(match M::deserialize(d)? { M::One(m) => vec![m], M::Many(v) => v })
 }
 
 fn one() -> f64 { 1.0 }
@@ -150,7 +205,27 @@ impl ChartSpec {
             return Err(format!("'{id}': a histogram has no `y`: it counts the values of `x`"));
         }
         if ys.len() > 3 || (ys.len() > 1 && !matches!(self.kind, ChartKind::Bar | ChartKind::Line)) {
-            return Err(format!("'{id}': a {} chart has {} `y` columns: a bar or a line has up to 3, a pie and a scatter 1", kind.as_str().unwrap(), ys.len()));
+            return Err(format!("'{id}': a {} chart has {} `y` columns: a bar or a line has up to 3, a pie, a scatter and a heatmap 1", kind.as_str().unwrap(), ys.len()));
+        }
+        let heat = self.kind == ChartKind::Heatmap;
+        if self.y_range.is_some() && !matches!(self.kind, ChartKind::Bar | ChartKind::Line) {
+            return Err(format!("'{id}': `y_range` is for a line or a bar chart"));
+        }
+        if !heat && (self.z.is_some() || self.group.is_some() || self.breaks.is_some() || self.colors.is_some() || !self.mark.is_empty()) {
+            return Err(format!("'{id}': `z`, `group`, `breaks`, `colors` and `mark` are for a heatmap"));
+        }
+        if heat && (ys.is_empty() || self.z.is_none() || self.data.is_none()) {
+            return Err(format!("'{id}': a heatmap needs `y` (its rows), `z` (the number column of the cells) and `data` (a row for each cell)"));
+        }
+        if let Some(b) = &self.breaks {
+            if b.windows(2).any(|w| w[1] <= w[0]) {
+                return Err(format!("'{id}': `breaks` must go up"));
+            }
+        }
+        if let Some(c) = &self.colors {
+            if c.len() != self.breaks.as_ref().map_or(0, Vec::len) + 1 {
+                return Err(format!("'{id}': `colors` has one more colour than `breaks`"));
+            }
         }
         if self.kind == ChartKind::Scatter && ys.is_empty() {
             return Err(format!("'{id}': a scatter chart needs `y`, a number column"));
@@ -165,7 +240,7 @@ impl ChartSpec {
             if self.follow {
                 return Err(format!("'{id}': `follow` is for the map's roads, and this chart has `data`, the page's own rows"));
             }
-            for c in std::iter::once(self.x.as_str()).chain(ys) {
+            for c in std::iter::once(self.x.as_str()).chain(ys).chain(self.z.as_deref()).chain(self.group.as_deref()) {
                 if !d.columns.iter().any(|k| k.name == c) {
                     let names: Vec<&str> = d.columns.iter().map(|k| k.name.as_str()).collect();
                     return Err(format!("'{id}': the column '{c}' is not in `data` (its columns: {})", names.join(", ")));
@@ -991,9 +1066,25 @@ mod tests {
         let ok = sec(serde_json::json!({"kind": "line", "x": "hour", "y": ["vehicles"], "data": data})).unwrap();
         // the rows go into the page as they are: a 64-bit integer as text stays exact
         assert_eq!(serde_json::to_value(&ok.panel.unwrap().sections[0]).unwrap()["chart"]["data"]["rows"][1][0], "9007199254740993");
+        let ok = sec(serde_json::json!({"kind": "line", "x": "hour", "y": "vehicles", "data": data, "y_range": "data"})).unwrap();
+        assert_eq!(ok.panel.unwrap().sections[0].chart.clone().unwrap().y_range, Some(YRange::Fit(YFit::Data)));
+        let ok = sec(serde_json::json!({"kind": "line", "x": "hour", "y": "vehicles", "data": data, "y_range": [40, null]})).unwrap();
+        assert_eq!(ok.panel.unwrap().sections[0].chart.clone().unwrap().y_range, Some(YRange::Ends([Some(40.0), None])));
+        // a heatmap: a row for each cell, the classes and a mark (one or a list)
+        let heat = serde_json::json!({"kind": "heatmap", "x": "hour", "y": "vehicles", "z": "vehicles", "data": data, "breaks": [45, 50], "colors": ["#cfe8c8", "#9fd28f", "#e6e36b"], "mark": {"x": 7}});
+        let c = sec(heat.clone()).unwrap().panel.unwrap().sections[0].chart.clone().unwrap();
+        assert_eq!((c.kind, c.mark.len()), (ChartKind::Heatmap, 1));
+        let with = |k: &str, v: serde_json::Value| { let mut h = heat.clone(); h[k] = v; h };
+        for (bad, said) in [(with("colors", serde_json::json!(["#fff"])), "one more colour than `breaks`"), (with("breaks", serde_json::json!([50, 45])), "must go up"),
+                            (with("z", serde_json::json!("dB")), "the column 'dB' is not in `data`"), (with("y_range", serde_json::json!("data")), "for a line or a bar"),
+                            (serde_json::json!({"kind": "heatmap", "x": "hour", "y": "vehicles", "data": data}), "needs `y` (its rows), `z`"),
+                            (serde_json::json!({"kind": "bar", "x": "a", "z": "b"}), "are for a heatmap")] {
+            let e = sec(bad.clone()).unwrap_err().to_string();
+            assert!(e.contains(said), "{bad}: {e}");
+        }
         for (bad, said) in [(serde_json::json!({"kind": "donut", "x": "a"}), "unknown variant"), (serde_json::json!({"kind": "bar"}), "missing field `x`"),
                             (serde_json::json!({"kind": "histogram", "x": "a", "y": "b"}), "a histogram has no `y`"),
-                            (serde_json::json!({"kind": "pie", "x": "a", "y": ["b", "c"]}), "a pie and a scatter 1"),
+                            (serde_json::json!({"kind": "pie", "x": "a", "y": ["b", "c"]}), "a pie, a scatter and a heatmap 1"),
                             (serde_json::json!({"kind": "scatter", "x": "a"}), "needs `y`"),
                             (serde_json::json!({"kind": "bar", "x": "a", "agg": "median"}), "unknown variant"),
                             (serde_json::json!({"kind": "bar", "x": "a", "colour": 1}), "colour"),

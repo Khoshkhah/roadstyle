@@ -140,3 +140,23 @@ def test_rs_sections_add_makes_a_chart_card_from_javascript(tmp_path):
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_a_heatmap_card_sends_chartpick_and_marks_the_cell(tmp_path):
+    rows = [{"hour": h, "height": z, "dB": 50 + h % 6 + z} for h in range(24) for z in (1.5, 4.5, 7.5)]
+    cards = [{"id": "day", "label": "One place", "part": "chart", "chart": {"kind": "heatmap", "x": "hour", "y": "height", "z": "dB", "data": rows,
+                                                                            "breaks": [45, 50, 55, 60], "colors": ["#cfe8c8", "#9fd28f", "#e6e36b", "#f5c242", "#ef8f3a"],
+                                                                            "mark": {"x": 8}}}]
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, tmp_path, cards)
+        try:
+            page.evaluate("window.picks = []; document.addEventListener('rs:chartpick', e => picks.push(e.detail))")
+            assert page.locator('[data-rs-section="day"] .rs-chart-mark').count() == 1
+            page.locator('[data-rs-section="day"] svg rect[data-i]').nth(5).click()
+            page.wait_for_timeout(100)
+            pick = page.evaluate("picks")[0]
+            assert set(pick["row"]) == {"hour", "height", "dB"} and len(pick["rows"]) == 1, pick
+            assert page.locator('[data-rs-section="day"] .rs-chart-mark').count() == 2       # the hour stays, the picked cell is framed
+        finally:
+            browser.close()
+    assert errors == [], errors

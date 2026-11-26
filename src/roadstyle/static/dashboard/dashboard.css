@@ -890,6 +890,9 @@ html.rs-phone .rs-chart[data-more]{-webkit-mask-image:linear-gradient(to bottom,
 .rs-chart svg .rs-mk.on{fill-opacity:1}      /* a little see-through; the mark under the pointer in its full colour */
 .rs-chart svg.rs-chart-dim .rs-mk:not(.on){opacity:.35}
 .rs-chart-none{color:var(--mut);margin:12px 0}
+.rs-chart-hm{flex:none;display:flex;min-width:0}      /* a heatmap: the row labels, and the grid in a box that scrolls to the side (chart.js) */
+.rs-chart-hm>svg{flex:none}
+.rs-chart-hscroll{flex:1 1 0;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) 47%,transparent) transparent}
 /* a pie with its legend beside it (chart.js puts it there when the pie is larger so): the pie and the legend in the middle of the box */
 .rs-chart.rs-chart-side{display:grid;grid-template-columns:1fr auto auto 1fr;align-content:start}
 .rs-chart-side>*{grid-column:1/-1}
