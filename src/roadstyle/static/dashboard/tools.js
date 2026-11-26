@@ -39,13 +39,25 @@ export const GOOGLE3D_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" st
 // the icon of the tool `roads`: a road in perspective, the dashed line down its middle
 export const ROADS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8.5 3 4 21M15.5 3 20 21"/><path d="M12 4.5v3M12 10.5v3M12 16.5v3" stroke-dasharray="0"/></svg>';
 export const LEGEND_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><path d="M14 7h6M14 17h6"/></svg>';
-const tools = new Map();                    // id -> {id, kind, el, title, group, open, close, isOpen, onClick}
+const tools = new Map();                    // id -> {id, kind, el, title, group, open, close, isOpen, onClick, sync}
+// the tools that the page greys out (rs.tools.disable): id -> its reason. The hold stays when the tool is made again (a new style) and when the tool reads
+// its own state again: a tool with its own state gives `sync`, which reads toolHold; the hold of another tool is put on its button here
+const holds = new Map();
+export const toolHold = id => holds.has(id) ? holds.get(id) : null;
+function applyHold(t){
+  if(t.sync) return t.sync();
+  const b = t.el.matches("button") ? t.el : t.el.querySelector("button"), why = toolHold(t.id);
+  if(!b) return;
+  if(why != null){ if(!b._rsWas) b._rsWas = [b.disabled, b.title || b.dataset.rsTip || ""]; b.disabled = true; b.title = why; t.disabled = true; t.title = why; }
+  else if(b._rsWas){ [b.disabled, b.title] = b._rsWas; delete b._rsWas; t.disabled = b.disabled; t.title = b.title; }
+}
 const LAST = ["settings", "attribution"];               // the last tool of a bar
 let sink = null;                            // the renderer that is mounted: a function that takes a list of tools
 export function defineTool(id, kind, el, more = {}){
   const t = {id, kind, el, title: "", ...more};
   tools.set(id, t);
   el.dataset.rsTool = id;
+  if(holds.has(id)) applyHold(t);
   if(sink) sink([t]);
   return t;
 }
@@ -59,6 +71,7 @@ export function replaceTool(id, kind, el, more = {}){
   tools.set(id, t);
   el.dataset.rsTool = id;
   slot.replaceWith(wrap(el));
+  if(holds.has(id)) applyHold(t);
   if(onReplace) onReplace(t);
   return t;
 }
@@ -138,6 +151,9 @@ export const rsTools = {
   // a tool of the page gets its behavior: {onClick}
   bind(id, spec){ const t = need(id); if(spec && spec.onClick) t.onClick = spec.onClick; return info(t); },
   remove(id){ const t = need(id), c = !t.group && t.el.closest(".maplibregl-ctrl"); (c || t.el).remove(); tools.delete(id); },
+  // a tool that stays in its place, greyed out, with the reason in its title (the page draws the thing itself, say); enable(id) gives the tool its own state back
+  disable(id, reason){ const t = need(id); holds.set(id, String(reason || "Off on this page")); applyHold(t); _emit("rs:toolchange", {id, state: "disable"}); return info(t); },
+  enable(id){ const t = need(id); if(holds.delete(id)) applyHold(t); _emit("rs:toolchange", {id, state: "enable"}); return info(t); },
   open(id){ const t = need(id); if(t.open) t.open(); _emit("rs:toolchange", {id, state: "open"}); },
   close(id){ const t = need(id); if(t.close) t.close(); _emit("rs:toolchange", {id, state: "close"}); },
 };

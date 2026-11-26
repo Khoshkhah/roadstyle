@@ -52,3 +52,14 @@ def test_a_geodataframe_has_no_geometry_and_a_list_of_dicts_is_a_table():
 def test_a_wrong_chart_is_an_error(chart, said):
     with pytest.raises(ValueError, match=said):
         rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"sections": [{"id": "c", "part": "chart", "chart": chart}]}})
+
+
+def test_a_heatmap_card_and_y_range_go_into_the_page(tmp_path):
+    df = pd.DataFrame({"hour": [7, 8, 7, 8], "height": [1.5, 1.5, 4.5, 4.5], "dB": [61.0, 63.5, None, 60.2]})
+    cards = [{"id": "h", "part": "chart", "chart": {"kind": "heatmap", "x": "hour", "y": "height", "z": "dB", "data": df, "breaks": [60], "colors": ["#9fd28f", "#e2522f"], "mark": {"x": 8}}},
+             {"id": "l", "part": "chart", "chart": {"kind": "line", "x": "hour", "y": "dB", "data": df, "y_range": "data"}}]
+    rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"sections": cards}}).save(tmp_path / "c.html")
+    secs = _sections((tmp_path / "c.html").read_text(encoding="utf-8"))
+    assert secs[0]["chart"]["z"] == "dB" and secs[0]["chart"]["mark"] == [{"x": 8}] and secs[1]["chart"]["y_range"] == "data"
+    with pytest.raises(ValueError, match="one more colour"):
+        rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"sections": [{**cards[0], "chart": {**cards[0]["chart"], "colors": ["#fff"]}}]}})

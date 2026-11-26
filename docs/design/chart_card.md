@@ -25,7 +25,7 @@ The same from JavaScript: `rs.sections.add({id, label, part: "chart", chart: {..
 
 | Option | Default | What it is |
 |---|---|---|
-| `kind` | (necessary) | `bar`, `line`, `histogram`, `scatter` or `pie`, as `rs.chart` |
+| `kind` | (necessary) | `bar`, `line`, `histogram`, `scatter`, `pie` or `heatmap`, as `rs.chart` |
 | `x` | (necessary) | A column: the groups (bar, pie), the order (line), the numbers (histogram, scatter) |
 | `y` | none | A number column, or a list of up to 3 (bar, line). None: the count of rows. Not for a histogram |
 | `agg` | `"sum"` | How the rows of one value of `x` join, when the source is the map's roads or `x` has a value more than once: `sum`, `mean`, `min`, `max` or `count` |
@@ -34,6 +34,8 @@ The same from JavaScript: `rs.sections.add({id, label, part: "chart", chart: {..
 | `title` | the card's `label` | The chart's title. A card with a label shows no second title |
 | `height` | `220` | The height of the chart in pixels |
 | `follow` | `false` | Map roads only: `true` draws the chart again for the roads that the map shows now (the filter of the roads box, the classes) |
+| `y_range` | none: from 0 | Line, bar: `"data"` (a line only) or `[lo, hi]` (2026-11-25: sound levels of 40 to 75 dB were all at the top of a chart from 0) |
+| `z`, `group`, `breaks`, `colors`, `mark` | | Heatmap (2026-11-25, noise-map's façade and hours): it needs `data`, one row for each cell; no groups of rows, so no `agg` |
 
 - **The source.** With no `data`, the chart reads the map's own road table (the rows that the page has for its popup and its colours), so
   `x` and `y` are road columns. With `data`, it reads those rows. The two never mix.

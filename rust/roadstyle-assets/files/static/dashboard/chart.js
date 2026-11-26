@@ -1,12 +1,22 @@
 // A chart of a table of rows (docs/design/ask_and_data_dock.md, "4. Charts"; docs/guides/dashboard-parts.md, "A chart"): bar, line, histogram, scatter
-// or pie, in SVG with the theme's tokens (--rs-chart-1 to -8, --rs-chart-grid, --mut, --ink), so it follows the theme with no code of its own. The marks are
+// pie or heatmap, in SVG with the theme's tokens (--rs-chart-1 to -8, --rs-chart-grid, --mut, --ink), so it follows the theme with no code of its own. The marks are
 // thin, a bar has round ends at its data end, a line is 2 px; the pointer on a mark shows its values (rs.hover); a click on a mark gives its row (onPick).
 // The chart fits its box: the bars get thinner to fit the height, down to a minimum; only past it the box scrolls. A pie is the largest circle that
 // fits above or beside its legend. A value label is on each bar or point only when all of them fit (at most 15); else the hover shows the value.
 //
-//   rs.chart(el, {kind, columns, rows, x, y, title, values, onPick, small, head}) -> {set(change), spec(), svg(), destroy()}
+//   rs.chart(el, {kind, columns, rows, x, y, title, values, onPick, small, head, y_range}) -> {set(change), spec(), svg(), destroy()}
 //     columns: [{name, type}]; rows: [[...]]; x: a column name; y: a column name or a list of them (bar, line); values: all the numbers of x (histogram);
-//     title: false: no title, only the count (a card has its label as the title); count: the text of the count ("13 298 roads")
+//     title: false: no title, only the count (a card has its label as the title); count: the text of the count ("13 298 roads");
+//     y_range (line, bar): "data": the y axis fits the values (a line only: a bar always starts at 0); [lo, hi]: the y axis covers at least lo to hi
+//     (null: that end fits the values). The axis always covers every value, and its ends are nice ticks. None: from 0 (a line with no value under 0)
+//   The legend of a line or a bar of two or more series is a filter: a click on a series hides it, a second click shows it (the last one stays); the
+//   series keep their colours, and the y axis fits the series that show
+//   heatmap: {kind: "heatmap", x, y, z, group, breaks, colors, mark}: a grid of cells, a column for each value of x and a row for each value of y, each cell
+//     coloured by the class of its value of z (no cell for null). Numbers go in order (the rows from the bottom up), text in the order of the rows.
+//     group: a column that puts the columns of the grid in groups, with a gap and the group's name under each group; breaks: the ascending class limits
+//     (a value v is in class n, n = the number of limits <= v); colors: one more colour than breaks (none: 5 classes of the values, in --rs-chart-1);
+//     mark: {x, y} a cell, {x} a column, {y} a row, or a list of them (with group: {x, group}). A click on a cell gives its row (onPick). A grid wider
+//     than its box scrolls to the side; the row labels stay.
 //   rs.chart.ranges(numbers, parts) -> {n, of(v), label(k)}: about `parts` ranges of the numbers (a bar or a pie of a number x with many values)
 import {rsSvg} from "./svg.js";
 import {rsHover} from "./hover.js";
@@ -44,6 +54,14 @@ export const rsChart = (() => {
     if(by(s.x) < 0) return `The column "${s.x}" is not in the result.`;
     for(const y of ys) if(by(y) < 0) return `The column "${y}" is not in the result.`;
     if(s.kind === "histogram") return isN(s.x) ? null : "A histogram needs a number column.";
+    if(s.kind === "heatmap"){
+      if(ys.length !== 1) return "A heatmap needs one column for y (its rows).";
+      if(by(s.z) < 0) return s.z == null ? "A heatmap needs a number column for z." : `The column "${s.z}" is not in the result.`;
+      if(!isN(s.z)) return "A heatmap needs a number column for z.";
+      if(s.group != null && by(s.group) < 0) return `The column "${s.group}" is not in the result.`;
+      if(s.colors && s.colors.length !== (s.breaks || []).length + 1) return "A heatmap has one more colour than breaks.";
+      if(s.breaks && s.breaks.some((b, k) => k && b <= s.breaks[k - 1])) return "The breaks of a heatmap go up.";
+      return null; }
     if(!ys.length) return `A ${s.kind} chart needs a number column for y.`;
     if(ys.some((y) => !isN(y))) return `A ${s.kind} chart needs number columns for y.`;
     const empty = ys.find((y) => s.rows.length && !s.rows.some((r) => num(r[by(y)]) != null));         // a number type with text in it (a DECIMAL as a quoted text)
@@ -51,7 +69,7 @@ export const rsChart = (() => {
     if(s.kind === "scatter" && !isN(s.x)) return "A scatter chart needs two number columns.";
     if(s.kind === "line" && !isN(s.x) && !TIME.test(String(s.columns[by(s.x)].type))) return "A line chart needs a number, a date or a time column for x.";
     if(s.kind === "pie" && (ys.length > 1 || s.rows.some((r) => (num(r[by(ys[0])]) ?? 0) < 0))) return "A pie chart needs a text column and one number column of 0 or more.";
-    if(!["bar", "line", "histogram", "scatter", "pie"].includes(s.kind)) return `There is no chart of the kind "${s.kind}".`;
+    if(!["bar", "line", "histogram", "scatter", "pie", "heatmap"].includes(s.kind)) return `There is no chart of the kind "${s.kind}".`;
     return null;
   }
 
@@ -63,20 +81,30 @@ export const rsChart = (() => {
     let lastW = 0, lastH = 0;
     const ro = new ResizeObserver(() => { if(Math.abs(el.clientWidth - lastW) > 2 || Math.abs(el.clientHeight - lastH) > 2) draw(); }); ro.observe(el);
     function set(change){ s = {...s, ...change}; draw(); }
+    let hsl = 0;                                                     // the side scroll of a heatmap, kept over a new draw
+    const off = new Set();                                           // the series that the legend hides
+    const ci = (y) => [].concat(s.y || []).indexOf(y);               // the colour slot of a series: its place in y, also when others are hidden
     function draw(){
       el.replaceChildren(); el.classList.remove("rs-chart-side");
       const bad = s.columns && s.rows ? check(s) : "No data.";
       if(bad){ el.append(Object.assign(document.createElement("p"), {className: "rs-chart-none", textContent: bad})); lastW = el.clientWidth; lastH = el.clientHeight; return; }
       const W = Math.max(160, el.clientWidth - 2), ys = [].concat(s.y || []);
+      for(const y of off) if(!ys.includes(y)) off.delete(y);           // (a new y: its hidden series go)
+      const filter = !s.small && ys.length > 1 && (s.kind === "line" || s.kind === "bar"), shown = filter ? ys.filter((y) => !off.has(y)) : ys;
       // the title and a muted line under it: what is drawn, and from how many rows (a small copy has neither: its card says it)
       if(!s.small){ const hd = document.createElement("div"), t = document.createElement("b"), sub = document.createElement("span"); hd.className = "rs-chart-hd";
-        t.textContent = s.title === false ? "" : s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : `${ys.join(" and ")} by ${s.x}`);
+        t.textContent = s.title === false ? "" : s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : s.kind === "heatmap" ? `${s.z} by ${s.x} and ${ys[0]}` : `${ys.join(" and ")} by ${s.x}`);
         const n = s.kind === "histogram" && s.values ? s.values.length : s.rows.length;
         sub.textContent = s.count != null ? s.count : `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(...(s.title === false ? [sub] : [t, sub]));
         if(s.head) s.head.replaceChildren(hd); else el.append(hd); }      // head: an element of the host for the title line (the data dock's tool row)
       // a small copy has no legend, but a pie keeps it: its slices have no names of their own (Kaveh: "legend is not there", the pie in Ask's card)
-      const legend = s.kind === "pie" || (!s.small && ys.length > 1) ? document.createElement("div") : null;
-      if(legend){ legend.className = "rs-chart-legend"; el.append(legend); if(s.kind !== "pie") legendOf(legend, ys.map((y, k) => [y, col(k)])); }
+      const legend = s.kind === "pie" || (!s.small && (ys.length > 1 || s.kind === "heatmap")) ? document.createElement("div") : null;
+      if(legend){ legend.className = "rs-chart-legend"; el.append(legend); if(s.kind !== "pie" && s.kind !== "heatmap") legendOf(legend, ys.map((y, k) => [y, col(k)]));
+        if(filter) [...legend.children].forEach((k, j) => { const y = ys[j], on = !off.has(y);
+          k.className = "rs-chart-key" + (on ? "" : " rs-off"); k.setAttribute("role", "button"); k.tabIndex = 0; k.setAttribute("aria-pressed", String(on));
+          k.setAttribute("aria-label", on ? `Hide ${y}` : `Show ${y}`);
+          const flip = () => { if(on && shown.length === 1) return; on ? off.add(y) : off.delete(y); draw(); el.querySelector(`.rs-chart-key:nth-child(${j + 1})`)?.focus(); };
+          k.addEventListener("click", flip); k.addEventListener("keydown", (e) => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); flip(); } }); }); }
       // the foot: a line under the chart when it does not show all the rows (empty: no line); a small copy has none
       foot = document.createElement("div"); foot.className = "rs-chart-foot"; if(!s.small) el.append(foot);
       foot.textContent = s.kind === "bar" && s.rows.length > BARS ? `… ${fmt(s.rows.length - BARS)} more in the table` : s.kind === "scatter" && s.rows.length > POINTS ? `The first ${fmt(POINTS)} of ${fmt(s.rows.length)} rows` : "";
@@ -88,8 +116,8 @@ export const rsChart = (() => {
       // the size and the paint of the drawing are in its style: a host's rule for icons (`#sb svg {width: 18px; fill: none; stroke: currentColor}`) is not for it
       svg.style.cssText = `width:100%;height:${H}px;fill:initial;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter`;
       el.insertBefore(svg, s.small ? null : foot);
-      const kinds = {bar, line, histogram, scatter, pie};
-      kinds[s.kind](W, H, ys, legend);
+      const kinds = {bar, line, histogram, scatter, pie, heatmap};
+      kinds[s.kind](W, H, shown, legend);
       // the box scrolls only when the drawing is taller than the box (bars at their least height); else nothing in it can make a scrollbar
       el.classList.toggle("rs-chart-scrolls", Number(svg.getAttribute("height")) > inner + 1);
       lastW = el.clientWidth; lastH = el.clientHeight; more();
@@ -99,7 +127,7 @@ export const rsChart = (() => {
     el.addEventListener("scroll", more, {passive: true});
     let inner = 0;
     // whole pixels: a box of 191.6 px (a scaled screen) with a 192 px drawing scrolls (Kaveh: "why it has scrol in this position?")
-    const room = () => Math.floor(inner - [...el.children].reduce((t, c) => t + (c === svg ? 0 : c.getBoundingClientRect().height), 0));
+    const room = () => Math.floor(inner - [...el.children].reduce((t, c) => t + (c === svg || c.contains(svg) ? 0 : c.getBoundingClientRect().height), 0));
     const size = (w, h) => { svg.setAttribute("height", h); svg.style.height = h + "px"; svg.setAttribute("viewBox", `0 0 ${w} ${h}`); };
     const at = (n) => s.columns.findIndex((c) => c.name === n);
     const tip = (node, i, extra) => { if(s.small) return;
@@ -107,7 +135,7 @@ export const rsChart = (() => {
       node.classList.add("rs-mk");                                   // under the pointer: this mark, the others fade (CSS)
       node.addEventListener("mouseenter", () => { svg.classList.add("rs-chart-dim"); node.classList.add("on"); });
       node.addEventListener("mouseleave", () => { svg.classList.remove("rs-chart-dim"); node.classList.remove("on"); });
-      rsHover.on(node, () => `<b>${esc(extra ? extra.head : s.rows[i][at(s.x)])}</b>` + (extra ? extra.lines : [].concat(s.y).map((y) => `<br>${esc(y)}: ${fmt(s.rows[i][at(y)])}`).join("")));
+      rsHover.on(node, () => `<b>${esc(extra ? extra.head : s.rows[i][at(s.x)])}</b>` + (extra ? extra.lines : [].concat(s.y).filter((y) => !off.has(y)).map((y) => `<br>${esc(y)}: ${fmt(s.rows[i][at(y)])}`).join("")));
       node.addEventListener("mouseleave", () => rsHover.hide());
       if(s.onPick && i != null) node.addEventListener("click", () => s.onPick(i));
     };
@@ -126,9 +154,13 @@ export const rsChart = (() => {
         rsSvg(svg, "text", {x: Math.max(half, Math.min(W - half, x)), y: pad.t + ih + 16, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, label); }
       return {pad, iw, ih, Y};
     }
+    // the y scale: from 0 (zero), or fitted to the values; y_range [lo, hi] makes it at least that wide (it never hides a value)
     const yRange = (ys, rows, zero = true) => { let lo = zero ? 0 : Infinity, hi = zero ? 0 : -Infinity;
       for(const r of rows) for(const y of ys){ const v = num(r[at(y)]); if(v != null){ lo = Math.min(lo, v); hi = Math.max(hi, v); } }
-      return ticks(isFinite(lo) ? lo : 0, isFinite(hi) ? hi : 1); };
+      const g = Array.isArray(s.y_range) ? s.y_range : [];
+      if(g[0] != null) lo = Math.min(lo, g[0]);
+      if(g[1] != null) hi = Math.max(hi, g[1]);
+      return ticks(isFinite(lo) ? lo : 0, isFinite(hi) ? hi : lo + 1); };
     // a bar with a round end (4 px) at its data end and a flat end at the base
     const barPath = (x, y, w, h, horizontal, up) => { const r = Math.min(4, (horizontal ? h : w) / 2, Math.abs(horizontal ? w : h));
       if(horizontal){ const x2 = x + w; return `M${x},${y}H${x2 - r}Q${x2},${y} ${x2},${y + r}V${y + h - r}Q${x2},${y + h} ${x2 - r},${y + h}H${x}Z`; }
@@ -151,7 +183,7 @@ export const rsChart = (() => {
         rows.forEach((r, i) => {
           rsSvg(svg, "text", {x: pad.l - 6, y: pad.t + band * i + band / 2 + 3.5, "text-anchor": "end", fill: "var(--ink)", "font-size": 11}, labels[i].length > 24 ? labels[i].slice(0, 23) + "…" : labels[i]);
           ys.forEach((y, k) => { const v = num(r[at(y)]) ?? 0, y0 = pad.t + band * i + (band - bh * ys.length) / 2 + bh * k;
-            tip(rsSvg(svg, "path", {d: barPath(X(Math.min(0, v)), y0 + 1, Math.abs(X(v) - X(0)), bh - 2, true), fill: col(k)}), i);
+            tip(rsSvg(svg, "path", {d: barPath(X(Math.min(0, v)), y0 + 1, Math.abs(X(v) - X(0)), bh - 2, true), fill: col(ci(y))}), i);
             // the value at the tip: of each bar up to 15 bars, else of the largest; in the text colour, never the bar's
             if(ys.length === 1 && (rows.length <= LABELS || i === top)) rsSvg(svg, "text", {class: "rs-chart-val", x: X(Math.max(0, v)) + 5, y: y0 + bh / 2 + 3.5, fill: "var(--ink)", "font-size": 10.5}, fmt(v)); });
         });
@@ -160,7 +192,7 @@ export const rsChart = (() => {
       if(H < 100){ H = 100; size(W, H); }                              // upright bars: a plot of at least 100 px
       const {pad, iw, Y} = frame(W, H, yr), band = iw / rows.length, bw = Math.max(2, Math.min(26, (band - 2) / ys.length));     // a bar is at most 24 px
       rows.forEach((r, i) => ys.forEach((y, k) => { const v = num(r[at(y)]) ?? 0, x0 = pad.l + band * i + (band - bw * ys.length) / 2 + bw * k;
-        tip(rsSvg(svg, "path", {d: barPath(x0 + 1, Math.min(Y(v), Y(0)), bw - 2, Math.abs(Y(v) - Y(0)), false, v >= 0), fill: col(k)}), i);
+        tip(rsSvg(svg, "path", {d: barPath(x0 + 1, Math.min(Y(v), Y(0)), bw - 2, Math.abs(Y(v) - Y(0)), false, v >= 0), fill: col(ci(y))}), i);
         // the value on the cap, when it fits over its bar's slot: of each bar up to 15 bars, else of the largest
         if(!s.small && ys.length === 1 && (rows.length <= LABELS || i === top) && fmt(v).length * 6.2 < band) rsSvg(svg, "text", {class: "rs-chart-val", x: x0 + bw / 2, y: Math.min(Y(v), Y(0)) - 5, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, fmt(v)); }));
       if(!s.small){ const every = Math.ceil(rows.length / Math.max(1, Math.floor(iw / 56)));
@@ -170,15 +202,15 @@ export const rsChart = (() => {
       const t = TIME.test(String(s.columns[at(s.x)].type)), xv = (r) => t ? when(r[at(s.x)]) : num(r[at(s.x)]);
       const idx = s.rows.map((r, i) => i).filter((i) => xv(s.rows[i]) != null).sort((a, b) => xv(s.rows[a]) - xv(s.rows[b]));
       // values of 0 or more: from 0; as many x ticks as fit (a day label needs about 80 px, a number 48 px)
-      const xs = idx.map((i) => xv(s.rows[i])), lo = Math.min(...xs), hi = Math.max(...xs), yr = yRange(ys, s.rows, !s.rows.some((r) => ys.some((y) => (num(r[at(y)]) ?? 0) < 0))), xr = ticks(lo, hi, Math.max(1, Math.min(5, Math.floor((W - 56) / (t ? 80 : 48)))));
+      const xs = idx.map((i) => xv(s.rows[i])), lo = Math.min(...xs), hi = Math.max(...xs), yr = yRange(ys, s.rows, s.y_range !== "data" && !Array.isArray(s.y_range) && !s.rows.some((r) => ys.some((y) => (num(r[at(y)]) ?? 0) < 0))), xr = ticks(lo, hi, Math.max(1, Math.min(5, Math.floor((W - 56) / (t ? 80 : 48)))));
       const pad0 = s.small ? 4 : 44, iw0 = W - pad0 - 12, X = (v) => pad0 + ((v - xr.lo) / (xr.hi - xr.lo || 1)) * iw0;
       const {Y} = frame(W, H, yr, {xt: xr.list.map((v) => [X(v), t ? dayFmt(v, hi - lo) : tick(v)])});
       ys.forEach((y, k) => {
         const pts = idx.map((i) => [X(xv(s.rows[i])), num(s.rows[i][at(y)])]).filter((p) => p[1] != null).map(([x, v]) => `${x},${Y(v)}`);
         if(ys.length === 1 && pts.length > 1){                        // one series: a soft wash under its line (10 %), and its last value at the end
           const fx = pts[0].split(",")[0], lx = pts[pts.length - 1].split(",")[0], b = Y(Math.max(yr.lo, Math.min(yr.hi, 0)));
-          rsSvg(svg, "polygon", {points: `${fx},${b} ${pts.join(" ")} ${lx},${b}`, fill: col(k), "fill-opacity": 0.1, stroke: "none"}); }
-        rsSvg(svg, "polyline", {points: pts.join(" "), fill: "none", stroke: col(k), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"});
+          rsSvg(svg, "polygon", {points: `${fx},${b} ${pts.join(" ")} ${lx},${b}`, fill: col(ci(y)), "fill-opacity": 0.1, stroke: "none"}); }
+        rsSvg(svg, "polyline", {points: pts.join(" "), fill: "none", stroke: col(ci(y)), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"});
         // the value over each point only when all of them fit: one line, at most 15 points, each label narrower than the space to the next point;
         // else no label (the hover shows the value)
         const pv = idx.map((i) => [X(xv(s.rows[i])), num(s.rows[i][at(y)])]).filter((p) => p[1] != null), lw = (v) => fmt(v).length * 6.2 + 6;
@@ -186,7 +218,7 @@ export const rsChart = (() => {
           for(const [x, v] of pv){ const w = lw(v) / 2, cy = Y(v);
             rsSvg(svg, "text", {class: "rs-chart-val", x: Math.max(w, Math.min(W - w, x)), y: cy - 8 < 10 ? cy + 16 : cy - 8, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, fmt(v)); }
         if(idx.length <= 60 && !s.small) idx.forEach((i) => { const v = num(s.rows[i][at(y)]); if(v == null) return;
-          tip(rsSvg(svg, "circle", {cx: X(xv(s.rows[i])), cy: Y(v), r: 4, fill: col(k), stroke: "var(--bg)", "stroke-width": 2}), i); });
+          tip(rsSvg(svg, "circle", {cx: X(xv(s.rows[i])), cy: Y(v), r: 4, fill: col(ci(y)), stroke: "var(--bg)", "stroke-width": 2}), i); });
       });
       if(idx.length > 60 && !s.small){                                  // many points: the nearest row to the pointer, with a crosshair
         const hit = rsSvg(svg, "rect", {x: pad0, y: 0, width: iw0, height: H, fill: "transparent"}), cross = rsSvg(svg, "line", {y1: 8, y2: H - 22, stroke: "var(--mut)", "stroke-width": 1, opacity: 0});
@@ -246,6 +278,101 @@ export const rsChart = (() => {
             {head: p.name, lines: `<br>${esc(y)}: ${fmt(p.v)} (${Math.round((p.v / total) * 100)} %)`});
         a0 = a1;
       });
+    }
+    function heatmap(W, H, ys, legend){
+      const xi = at(s.x), yi = at(ys[0]), zi = at(s.z), gi = s.group != null ? at(s.group) : -1, lab = (v) => v == null ? "null" : typeof v === "number" ? fmt(v) : String(v);
+      // the columns {k, x, g} and the rows {k, y}, each value once; numbers in order (the columns of a group stay together), text as the rows come
+      const cols = new Map(), rws = new Map(), cell = new Map(), gOrder = new Map();
+      s.rows.forEach((r, i) => { const g = gi < 0 ? null : r[gi], k = (gi < 0 ? "" : String(g) + "\u0000") + String(r[xi]), yk = String(r[yi]);
+        if(!gOrder.has(String(g))) gOrder.set(String(g), gOrder.size);
+        if(!cols.has(k)) cols.set(k, {k, x: r[xi], g}); if(!rws.has(yk)) rws.set(yk, {k: yk, y: r[yi]});
+        if(num(r[zi]) != null) cell.set(k + "\u0001" + yk, i); });
+      let cx = [...cols.values()], ry = [...rws.values()];
+      if(cx.every((c) => num(c.x) != null)) cx.sort((a, b) => gOrder.get(String(a.g)) - gOrder.get(String(b.g)) || num(a.x) - num(b.x));
+      else if(gi >= 0) cx.sort((a, b) => gOrder.get(String(a.g)) - gOrder.get(String(b.g)));       // (a stable sort: the order of the rows inside a group)
+      if(ry.every((r) => num(r.y) != null)) ry.sort((a, b) => num(b.y) - num(a.y));                   // the smallest at the bottom
+      // the classes: the page's limits and colours, or 5 classes of the values in the first chart colour, from light to full
+      const zs = [...cell.values()].map((i) => num(s.rows[i][zi]));
+      let br = s.breaks, cl = s.colors;
+      if(!br){ const t = ticks(Math.min(...zs), Math.max(...zs), 5).list; br = t.slice(1, -1); }
+      if(!cl) cl = br.concat([0]).map((_, k, a) => `color-mix(in srgb, var(--rs-chart-1) ${Math.round(15 + 85 * k / Math.max(1, a.length - 1))}%, var(--bg))`);
+      const klass = (v) => br.filter((b) => b <= v).length;
+      // the legend: one bar of the class colours, the limits under the joins and the name of z at its end
+      if(legend){ const bar = document.createElement("div"), cells = document.createElement("div"), lims = document.createElement("div"), unit = document.createElement("span");
+        bar.className = "rs-chart-scale"; cells.className = "rs-chart-scale-bar"; lims.className = "rs-chart-scale-lim"; unit.textContent = s.z;
+        bar.setAttribute("role", "img"); bar.setAttribute("aria-label", `${s.z}: ` + cl.map((c, k) => k === 0 ? `under ${fmt(br[0])}` : k === br.length ? `${fmt(br[k - 1])} or more` : `${fmt(br[k - 1])} to ${fmt(br[k])}`).join(", "));
+        for(const c of cl){ const i = document.createElement("i"); i.style.background = c; cells.append(i); }
+        br.forEach((b, k) => { const t = document.createElement("span"); t.textContent = fmt(b); t.style.left = `${(k + 1) / cl.length * 100}%`; lims.append(t); });
+        const col0 = document.createElement("div"); col0.append(cells, lims); bar.append(col0, unit); legend.replaceChildren(bar);
+        H = Math.max(100, room()); }                                  // (the legend is in its place now)
+      // the text of a cell on the page's colour #rrggbb: dark on a light colour, light on a dark one (a theme token cannot follow the page's colour)
+      const ink = (c) => { const m = /^#([0-9a-f]{6})$/i.exec(c); if(!m) return "var(--ink)"; const n = parseInt(m[1], 16);
+        return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.55 ? "#1a1a1a" : "#ffffff"; };
+      // the size: the row labels at the left, the columns share the rest (a gap between groups); a column of less than 6 px makes the grid wider than
+      // the box, and the box scrolls to the side; a row is at least 10 px, else the box scrolls down. Over the grid: the name of y; under it: the
+      // column labels, then the group names or the name of x
+      const G = 8, MINW = s.small ? 1 : 6, MINH = s.small ? 1 : 10;
+      const lw = s.small ? 0 : Math.min(120, 12 + 6.2 * Math.max(String(ys[0]).length, ...ry.map((r) => lab(r.y).length)));      // (the name of y over the labels too)
+      const gaps = cx.filter((c, j) => j && String(c.g) !== String(cx[j - 1].g)).length, top = s.small ? 0 : 16, bot = s.small ? 0 : 36;
+      const cw = Math.max(MINW, (W - lw - 4 - gaps * G) / Math.max(1, cx.length));
+      const xs = []; let at0 = 0; cx.forEach((c, j) => { if(j && String(c.g) !== String(cx[j - 1].g)) at0 += G; xs.push(at0); at0 += cw; });
+      const GW = Math.ceil(at0) + 4;
+      // two drawings side by side: the row labels, and the grid in a box that scrolls to the side (its scrollbar takes height from the rows)
+      const side = rsSvg(null, "svg", {width: lw, height: H, "aria-hidden": "true"}), wrapEl = document.createElement("div"), scroll = document.createElement("div");
+      wrapEl.className = "rs-chart-hm"; scroll.className = "rs-chart-hscroll"; side.style.cssText = svg.style.cssText; side.style.width = lw + "px";
+      svg.replaceWith(wrapEl); wrapEl.append(side, scroll); scroll.append(svg);
+      svg.setAttribute("width", GW); svg.removeAttribute("preserveAspectRatio"); svg.style.width = GW + "px"; size(GW, 1);
+      if(s.small) side.remove();
+      const ch = Math.max(MINH, (H - (scroll.offsetHeight - scroll.clientHeight) - top - bot) / Math.max(1, ry.length));
+      H = Math.ceil(top + ch * ry.length + bot); size(GW, H); side.setAttribute("height", H); side.style.height = H + "px";
+      // a cell is a tile: a gap round it and round corners, when it is large enough
+      const gp = Math.min(cw, ch) >= 8 ? 1.5 : Math.min(cw, ch) >= 4 ? 1 : 0, rr = Math.min(cw, ch) >= 8 ? 2 : 0, yb = top + ch * ry.length;
+      // the marks: a column or a row is a light band behind its tiles and its label in a dark tag; a cell is a ring in the text colour round it
+      const marks = [].concat(s.mark || []).map((m) => {
+        const nx = m.x == null ? null : cx.findIndex((c) => String(c.x) === String(m.x) && (m.group == null || String(c.g) === String(m.group)));
+        const ny = m.y == null ? null : ry.findIndex((r) => String(r.y) === String(m.y));
+        return nx === -1 || ny === -1 || (nx == null && ny == null) ? null : {nx, ny}; }).filter(Boolean);
+      const tagX = new Set(), tagY = new Set();
+      for(const {nx, ny} of marks){ if(nx != null && ny != null) continue;
+        if(ny == null){ tagX.add(nx); rsSvg(svg, "rect", {class: "rs-chart-mark", x: xs[nx] - 2, y: top - 4, width: cw + 4, height: ch * ry.length + 8, rx: 4, fill: "color-mix(in srgb, var(--ink) 12%, transparent)", "pointer-events": "none"}); }
+        else { tagY.add(ny); rsSvg(svg, "rect", {class: "rs-chart-mark", x: -2, y: top + ch * ny - 2, width: at0 + 4, height: ch + 4, rx: 4, fill: "color-mix(in srgb, var(--ink) 12%, transparent)", "pointer-events": "none"}); } }
+      ry.forEach((r, j) => { const y = top + ch * j;
+        cx.forEach((c, n) => { const i = cell.get(c.k + "\u0001" + r.k); if(i == null) return;
+          const v = num(s.rows[i][zi]), f = cl[klass(v)], t = fmt(v);
+          rsSvg(svg, "rect", {x: xs[n] + gp / 2, y: y + gp / 2, width: Math.max(0.5, cw - gp), height: Math.max(0.5, ch - gp), rx: rr, fill: f, "data-i": i});
+          if(!s.small && ch >= 12 && cw >= t.length * 6 + 4) rsSvg(svg, "text", {x: xs[n] + cw / 2, y: y + ch / 2 + 3.5, "text-anchor": "middle", fill: ink(f), "font-size": 10, "pointer-events": "none"}, t); }); });
+      for(const {nx, ny} of marks) if(nx != null && ny != null){ const x = xs[nx], y = top + ch * ny;
+        rsSvg(svg, "rect", {class: "rs-chart-mark", x: x - 1, y: y - 1, width: cw + 2, height: ch + 2, rx: rr + 2, fill: "none", stroke: "var(--ink)", "stroke-width": 2, "pointer-events": "none"});
+        rsSvg(svg, "rect", {x: x + gp / 2 + 0.5, y: y + gp / 2 + 0.5, width: Math.max(0.5, cw - gp - 1), height: Math.max(0.5, ch - gp - 1), rx: rr, fill: "none", stroke: "var(--bg)", "stroke-width": 1, "pointer-events": "none"}); }
+      if(s.small) return;
+      // a label in a dark tag (a marked column or row)
+      const tag = (on, x, y, text, anchor) => { const w = text.length * 6.2 + 10, x0 = anchor === "end" ? x - w + 4 : x - w / 2;
+        rsSvg(on, "rect", {x: x0, y: y - 11.5, width: w, height: 16, rx: 4, fill: "var(--ink)"});
+        rsSvg(on, "text", {x: x0 + w / 2, y, "text-anchor": "middle", fill: "var(--bg)", "font-size": 10.5, "font-weight": 600}, text); };
+      // the labels: as many as fit (a row label needs 12 px, and with more than 6 rows every second one; a column label its width)
+      const ev = Math.max(ry.length > 6 ? 2 : 1, Math.ceil(12 / ch));
+      rsSvg(side, "text", {x: lw - 6, y: 10, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, ys[0]);
+      ry.forEach((r, j) => { const y = top + ch * j + ch / 2 + 3.5;
+        if(tagY.has(j)) tag(side, lw - 4, y, lab(r.y), "end"); else if((ry.length - 1 - j) % ev === 0) rsSvg(side, "text", {x: lw - 6, y, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, lab(r.y)); });
+      const xe = Math.ceil((6.2 * Math.max(1, ...cx.map((c) => lab(c.x).length)) + 8) / cw);
+      cx.forEach((c, n) => { const x = xs[n] + cw / 2, near = [...tagX].some((t) => t !== n && Math.abs(xs[t] - xs[n]) < (lab(c.x).length * 6.2 + 16));
+        if(tagX.has(n)) tag(svg, x, yb + 15, lab(c.x)); else if(n % xe === 0 && !near) rsSvg(svg, "text", {x, y: yb + 15, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, lab(c.x)); });
+      if(gi >= 0) for(let a = 0; a < cx.length;){ let b = a; while(b + 1 < cx.length && String(cx[b + 1].g) === String(cx[a].g)) b++;
+        const span = xs[b] + cw - xs[a], name = lab(cx[a].g), fit = Math.floor((span - 4) / 6.2);
+        if(fit >= 2) rsSvg(svg, "text", {x: xs[a] + span / 2, y: yb + 31, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, name.length > fit ? name.slice(0, fit - 1) + "…" : name);
+        a = b + 1; }
+      else rsSvg(svg, "text", {x: at0, y: yb + 31, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, s.x);
+      // the pointer on a cell: its row, its column and its value, and a frame round it; a click gives its row
+      const hov = rsSvg(svg, "rect", {width: cw + 1, height: ch + 1, rx: rr + 1, fill: "none", stroke: "var(--ink)", "stroke-width": 1.5, opacity: 0, "pointer-events": "none"});
+      const under = (e) => { const i = e.target && e.target.getAttribute && e.target.getAttribute("data-i"); return i == null ? null : +i; };
+      rsHover.on(svg, (e) => { const i = under(e); if(i == null){ hov.setAttribute("opacity", 0); return null; }
+        const r = s.rows[i], c = e.target;
+        hov.setAttribute("x", +c.getAttribute("x") - gp / 2 - 0.5); hov.setAttribute("y", +c.getAttribute("y") - gp / 2 - 0.5); hov.setAttribute("opacity", 1);
+        return `<b>${esc(ys[0])} ${esc(lab(r[yi]))} · ${esc(s.x)} ${esc(lab(r[xi]))}</b>` + (gi >= 0 ? `<br>${esc(s.group)}: ${esc(lab(r[gi]))}` : "") + `<br>${esc(s.z)}: ${fmt(r[zi])}`; });
+      svg.addEventListener("mouseleave", () => { rsHover.hide(); hov.setAttribute("opacity", 0); });
+      svg.style.cursor = s.onPick ? "pointer" : "default";
+      if(s.onPick) svg.addEventListener("click", (e) => { const i = under(e); if(i != null) s.onPick(i); });
+      scroll.scrollLeft = hsl; scroll.addEventListener("scroll", () => { hsl = scroll.scrollLeft; }, {passive: true});
     }
     draw();
     return {set, spec: () => ({...s}), svg: () => svg, destroy(){ ro.disconnect(); el.replaceChildren(); }};

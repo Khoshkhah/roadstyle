@@ -880,6 +880,11 @@ html[data-rs-theme=dark]{--rs-chart-1:#159cb1;--rs-chart-2:#d95926;--rs-chart-3:
 .rs-chart-legend{flex:none;display:flex;flex-wrap:wrap;gap:4px 12px;min-height:20px;color:var(--ink);font-size:11.5px}
 .rs-chart-legend span{display:inline-flex;align-items:center;gap:5px}
 .rs-chart-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.rs-chart-legend .rs-chart-key{cursor:pointer;border-radius:4px;padding:1px 4px;margin:-1px -4px;user-select:none}      /* the legend of two or more series: a filter (chart.js) */
+.rs-chart-legend .rs-chart-key:hover{background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.rs-chart-legend .rs-chart-key:focus-visible{outline:2px solid var(--rs-chart-1);outline-offset:1px}
+.rs-chart-legend .rs-chart-key.rs-off{color:var(--mut);text-decoration:line-through}
+.rs-chart-legend .rs-chart-key.rs-off i{background:none!important;box-shadow:inset 0 0 0 1.5px var(--mut)}
 .rs-chart-foot{color:var(--mut);font-size:11px;min-height:16px}
 .rs-chart-foot:empty{display:none}
 html.rs-phone .rs-chart[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
@@ -890,6 +895,16 @@ html.rs-phone .rs-chart[data-more]{-webkit-mask-image:linear-gradient(to bottom,
 .rs-chart svg .rs-mk.on{fill-opacity:1}      /* a little see-through; the mark under the pointer in its full colour */
 .rs-chart svg.rs-chart-dim .rs-mk:not(.on){opacity:.35}
 .rs-chart-none{color:var(--mut);margin:12px 0}
+.rs-chart-hm{flex:none;display:flex;min-width:0}      /* a heatmap: the row labels, and the grid in a box that scrolls to the side (chart.js) */
+.rs-chart-hm>svg{flex:none}
+.rs-chart-hscroll{flex:1 1 0;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) 47%,transparent) transparent}
+.rs-chart-scale{flex:1 1 100%;display:flex;align-items:flex-start;gap:8px;min-height:30px}      /* the legend of a heatmap: one bar of the class colours, the limits under the joins */
+.rs-chart-scale>div{position:relative;flex:0 1 280px;min-width:120px}
+.rs-chart-scale-bar{display:flex;height:9px;border-radius:3px;overflow:hidden}
+.rs-chart-scale-bar i{flex:1}
+.rs-chart-scale-lim{position:relative;height:16px;color:var(--mut);font-size:10.5px;font-variant-numeric:tabular-nums}
+.rs-chart-scale-lim span{position:absolute;top:2px;transform:translateX(-50%)}
+.rs-chart-scale>span{color:var(--mut);font-size:10.5px;line-height:9px}
 /* a pie with its legend beside it (chart.js puts it there when the pie is larger so): the pie and the legend in the middle of the box */
 .rs-chart.rs-chart-side{display:grid;grid-template-columns:1fr auto auto 1fr;align-content:start}
 .rs-chart-side>*{grid-column:1/-1}

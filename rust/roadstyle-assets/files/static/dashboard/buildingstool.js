@@ -6,7 +6,7 @@
 // (core.js `_ownBuildings`), so a page with both draws one set. The button is grey, with its reason in the title, on a page with no source.
 // No row of the base-map box and no row of the scene repeats it. The calls of the sources stay: rsBuildings, rsSetBuildings3D, rsScene3dKind("buildings").
 import {O, OVERLAYS, _ownBuildings} from "./core.js";
-import {replaceTool, getTool, BUILDINGS_ICON} from "./tools.js";
+import {replaceTool, getTool, toolHold, BUILDINGS_ICON} from "./tools.js";
 import {rsBuildings, rsBuildingsByPerson, _bmHasVector, _bmHasVectorStyle} from "./basemap.js";
 import {rsSetBuildings3D, _b3dHas, _b3dIsOn} from "./features.js";
 import {rsScene3d, rsScene3dKind, _s3HasBuildings, _s3BuildingsShown} from "./scene3d.js";
@@ -23,11 +23,11 @@ function _btSet(on){
 }
 function _btSync(){
   if(!_btEl) return;
-  const s = _btSources(), any = s.scene || s.own || s.ofm, on = any && _btShown();
-  _btEl.disabled = !any;
+  const s = _btSources(), any = s.scene || s.own || s.ofm, on = any && _btShown(), why = toolHold("buildings");     // why: the page greys it out (rs.tools.disable)
+  _btEl.disabled = !any || why != null;
   _btEl.classList.toggle("rs-on", on);
-  _btEl.title = !any ? "3D buildings need a vector base map (OpenFreeMap), buildings of the area, or a 3D scene with buildings" : on ? "Flat buildings" : "Buildings in 3D";
-  const t = getTool("buildings"); if(t) t.title = _btEl.title;
+  _btEl.title = why != null ? why : !any ? "3D buildings need a vector base map (OpenFreeMap), buildings of the area, or a 3D scene with buildings" : on ? "Flat buildings" : "Buildings in 3D";
+  const t = getTool("buildings"); if(t){ t.title = _btEl.title; t.disabled = _btEl.disabled; }
 }
 // the tool of the page, made once (a later style does not make it again), and its state read again
 export function useBuildingsTool(){
@@ -38,7 +38,7 @@ export function useBuildingsTool(){
     b.type = "button"; b.id = "rs-b3d-btn"; b.innerHTML = BUILDINGS_ICON; d.appendChild(b);
     b.onclick = () => _btSet(!_btShown());
     _btEl = b;
-    replaceTool("buildings", "toggle", d, {title: "", isOpen: () => _btShown()});
+    replaceTool("buildings", "toggle", d, {title: "", isOpen: () => _btShown(), sync: _btSync});
   }
   _btSync();
 }

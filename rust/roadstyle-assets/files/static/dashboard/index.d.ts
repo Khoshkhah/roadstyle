@@ -142,6 +142,10 @@ export interface Tools {
   /** Gives a tool of the page its behavior. */
   bind(id: string, spec: { onClick?: (e: Event) => void }): ToolInfo;
   remove(id: string): void;
+  /** Greys out a tool in its place, with the reason in its title (the page draws the thing itself). The hold stays over a new style. */
+  disable(id: string, reason?: string): ToolInfo;
+  /** Gives a greyed-out tool its own state back. */
+  enable(id: string): ToolInfo;
   /** Opens or closes a box or a window. */
   open(id: string): void;
   close(id: string): void;
@@ -165,8 +169,8 @@ export interface Sections {
 
 /** The options of a chart card (`part: "chart"`, chartcard.js; docs/guides/dashboard-parts.md, "A chart"). No `data`: the map's roads. */
 export interface ChartCard {
-  kind: "bar" | "line" | "histogram" | "scatter" | "pie";
-  /** The groups (bar, pie), the order (line), the numbers (histogram, scatter). */
+  kind: "bar" | "line" | "histogram" | "scatter" | "pie" | "heatmap";
+  /** The groups (bar, pie), the order (line), the numbers (histogram, scatter), the columns of the grid (heatmap). */
   x: string;
   /** A number column, or up to 3 (bar, line); none: the count of rows. Not for a histogram. */
   y?: string | string[];
@@ -181,7 +185,19 @@ export interface ChartCard {
   height?: number;
   /** The map's roads only: draw again for the roads that the map shows now. */
   follow?: boolean;
+  /** Line, bar: "data": the y axis fits the values (a line only); [lo, hi]: the y axis covers at least lo to hi (null: that end fits). None: from 0. */
+  y_range?: "data" | [number | null, number | null];
+  /** Heatmap (needs data; y is the rows of the grid): the number column of the cells. */
+  z?: string;
+  /** Heatmap: a column that puts the columns of the grid in groups, with a gap and the group's name under each group. */
+  group?: string;
+  /** Heatmap: the ascending class limits, and one more colour than limits. None: 5 classes of the values. */
+  breaks?: number[];
+  colors?: string[];
+  /** Heatmap: a cell {x, y}, a column {x}, a row {y} (with group: {x, group}) that has a frame. A click on a cell marks it. */
+  mark?: HeatMark | HeatMark[];
 }
+export interface HeatMark { x?: unknown; y?: unknown; group?: unknown }
 
 /** The detail of rs:chartpick: a click on a mark of a chart card with `data`. */
 export interface ChartPick { id: string; row: Record<string, unknown>; rows: number[] }
