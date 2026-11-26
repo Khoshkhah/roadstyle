@@ -72,7 +72,7 @@ export function buildBox(menu){
     tops.labels.c.checked = on;                       // the switches show the state of the map that is on
     const own = _ownBuildings();                       // the area's own buildings are shown: they have their own switch, and the vector style's are not drawn
     opRow.hidden = !((vec && !own && rsBuildings()) || (own && window.rsGetBuildings3D && window.rsGetBuildings3D()));      // the slider: the vector style's buildings, or the area's own in 3D
-    tunRow.hidden = !tops.terrain.c.checked;
+    tunRow.hidden = !tops.terrain.c.checked || O.terrain_control === false;
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
     _elHillshade(tops.hillshade.c.checked, firstRoad()); rsTerrain(tops.terrain.c.checked); _elTunnels();
@@ -85,7 +85,9 @@ export function buildBox(menu){
   };
   const keep = (id, start) => { const v = _bxGet(id); return v == null ? !!start : v === "1"; };       // the person's saved choice, else the page's start (hillshade=, terrain=)
   topRow("hillshade", "Hillshade").checked = keep("hillshade", O.hillshade);
-  topRow("terrain", "3D terrain").checked = keep("terrain", O.terrain);
+  // terrain_control=False: no row, and no saved choice (a page that draws flat layers: the terrain puts them in the wrong places); terrain= and rsTerrain still work
+  topRow("terrain", "3D terrain").checked = O.terrain_control === false ? !!O.terrain : keep("terrain", O.terrain);
+  tops.terrain.lab.hidden = O.terrain_control === false;
   // what a tunnel does on the terrain (elevation.js, terrain_tunnels=): show it, fade it or hide it; a row under the switch, shown only while the terrain is on
   // the opacity of the tunnels on the terrain: a slider as the buildings' Opacity, 0 (hidden) to 1 (shown)
   const tunRow = _bxEl("label", "rs-set-slide rs-bm-opacity rs-bm-tunnels"), tunIn = _bxEl("input"), tunVal = _bxEl("b");
@@ -124,7 +126,7 @@ export function buildBox(menu){
   window.rsGround = rsGround;
   window.rsTerrainTunnels = rsTerrainTunnels;
   window.rsTunnelsOpacity = rsTunnelsOpacity;
-  document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; tunRow.hidden = !e.detail.on; });
+  document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; tunRow.hidden = !e.detail.on || O.terrain_control === false; });
   // the area's own 3D buildings on or off: the row, and the opacity they have now (their style's until the person moves the slider)
   document.addEventListener("rs:buildings3dchange", () => { opRow.hidden = !((vector() && !_ownBuildings() && rsBuildings()) || (_ownBuildings() && window.rsGetBuildings3D && window.rsGetBuildings3D())); opShow(rsBuildingsOpacity()); });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };

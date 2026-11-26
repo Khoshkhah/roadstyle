@@ -21,7 +21,7 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true, "overlays_label": null,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
     "street_view_key": null, "street_view_mode": null, "mapillary_token": null, "google_3d": null, "hover_color": null, "compress": true, "views": null, "tiles": true, "lazy_overlays": false, "files_salt": null,
-    "template": null, "layout": null, "dashboard": null, "page_script": null, "vehicles": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": [], "google_3d_selected": true, "hillshade": false, "terrain": false, "terrain_exaggeration": null, "terrain_tunnels": "fade", "buildings_opacity": null, "ground": null, "scene_3d": null}"#;
+    "template": null, "layout": null, "dashboard": null, "page_script": null, "vehicles": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": [], "google_3d_selected": true, "hillshade": false, "terrain": false, "terrain_control": true, "terrain_exaggeration": null, "terrain_tunnels": "fade", "buildings_opacity": null, "ground": null, "scene_3d": null}"#;
 
 /// The map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
 const SIDEBAR_YIELDS: [&str; 3] = ["name", "road_popup", "minzoom"];
@@ -92,6 +92,7 @@ struct PageKeys {
     legend: bool,
     hillshade: bool,
     terrain: bool,
+    terrain_control: bool,
     terrain_exaggeration: Option<f64>,
     terrain_tunnels: String,
     buildings_opacity: Option<f64>,
@@ -394,7 +395,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), street_view_mode: k.street_view_mode.clone().unwrap_or_default(), google_3d,
         mapillary_token: k.mapillary_token.clone().unwrap_or_default(),
         select_color: ctl["select_color"].clone(), dock: ctl["dock"].clone(), vehicle_look: ctl["vehicle_look"].clone(), vehicles: k.vehicles.clone(), filter: ctl["filter"].clone(), filter_control: k.filter_control,
-        color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend, hillshade: k.hillshade, terrain: k.terrain, terrain_exaggeration: k.terrain_exaggeration, terrain_tunnels: k.terrain_tunnels.clone(), buildings_opacity: k.buildings_opacity, ground: k.ground.clone(), scene_3d: crate::scene3d::option(&k.scene_3d, &k.ground)?,
+        color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend, hillshade: k.hillshade, terrain: k.terrain, terrain_control: k.terrain_control, terrain_exaggeration: k.terrain_exaggeration, terrain_tunnels: k.terrain_tunnels.clone(), buildings_opacity: k.buildings_opacity, ground: k.ground.clone(), scene_3d: crate::scene3d::option(&k.scene_3d, &k.ground)?,
         color_active: ctl["color_active"].clone(), overlays: overlays_with_rows(&ctl["overlays"], &inter["base_props"]), overlay_control: k.overlay_control, overlays_label: k.overlays_label.clone(), boundary_shape: meta["roadstyle:boundary_shape"].clone(),
         overlay_layers: meta["roadstyle:overlay_layers"].clone(),
         overlay_popup: k.overlay_popup, tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),

@@ -42,6 +42,9 @@ pub struct PageOptions {
     /// the hillshade and the 3D terrain of the base-map box start on (the person's saved choice wins): from the DEM of `ontop.dem`
     pub hillshade: bool,
     pub terrain: bool,
+    /// `false` (`terrain_control=False`): the base-map box has no *3D terrain* row and no Tunnels slider, and the saved choice of the person is not
+    /// read, so the terrain is on only by `terrain=` or `rsTerrain` (a page that draws flat layers, which the terrain puts in the wrong places)
+    pub terrain_control: bool,
     /// the height of the terrain as a multiple of the DEM's (`terrain_exaggeration=`); `None`: `ontop.terrain.exaggeration` of data/basemaps.json
     pub terrain_exaggeration: Option<f64>,
     /// the tunnels while the 3D terrain is on: "show" (as they are), "fade" (drawn at `ontop.terrain.tunnel_fade`), "hide" (not drawn). No height of their own: MapLibre has none for a line

@@ -133,7 +133,7 @@ What each part of the dashboard screen does, and how to change it. Each item has
 ![The base-map box: seven base maps, and Hillshade, 3D terrain, Labels and One-way arrows under On top](../img/dashboard-basemap-box.png){ width="320" }
 
 **Use it for:** the base map, and the switches *On top*: hillshade, 3D terrain, labels and one-way arrows, and the *3D buildings opacity* slider while 3D buildings are on. The switch for the 3D buildings is the toolbox's own button.<br>
-**From Python:** yes, `basemap=`, `basemaps=`, `hillshade=`, `terrain=`, `arrows=`, `buildings_opacity=`
+**From Python:** yes, `basemap=`, `basemaps=`, `hillshade=`, `terrain=`, `terrain_control=False` (no *3D terrain* row), `arrows=`, `buildings_opacity=`
 { .rs-facts }
 
 === "Python"

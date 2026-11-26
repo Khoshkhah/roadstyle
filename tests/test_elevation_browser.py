@@ -89,6 +89,26 @@ def test_the_keywords_start_them_on_and_a_saved_choice_wins():
     assert not errors, errors
 
 
+
+def test_terrain_control_false_takes_the_row_away_and_ignores_a_saved_choice():
+    """A page that draws flat layers (noise-map's three.js buildings, 2026-11-26): the terrain puts them in the wrong places."""
+    tile, errors = _tile(), []
+    html = rs.render_dashboard(_edges(), basemap="blank", terrain_control=False).html
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = _open(browser, html, errors, tile)
+        page.evaluate("localStorage.setItem('rs-top:terrain', '1')")                         # a person turned it on earlier, on a page with the row
+        page.reload()
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
+        page.wait_for_timeout(1200)
+        assert page.evaluate("""[!!map.getTerrain(), document.getElementById('rs-top-terrain').closest('label').hidden,
+            document.getElementById('rs-top-terrain-tunnels').closest('label').hidden]""") == [False, True, True]
+        page.evaluate("rsTerrain(true)")                                                      # the page's own script can still turn it on
+        page.wait_for_timeout(500)
+        assert page.evaluate("[!!map.getTerrain(), document.getElementById('rs-top-terrain-tunnels').closest('label').hidden]") == [True, True]
+        browser.close()
+    assert not errors, errors
+
 def test_terrain_exaggeration_is_the_keyword_else_the_config():
     tile, errors = _tile(), []
     with pw.sync_playwright() as p:
