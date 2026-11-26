@@ -59,6 +59,35 @@ export function initCore(m, opts){
   map.on("styleimagemissing", _emptyImage);
   map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; if(_SRC.decks && e.sourceId===RS_PREFIX+_SRC.decks.source) _decks=null; });
   window.rsQuery = rsQuery; window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight; window.rsFocus = rsFocus;
+  if(!_pruneStates()) map.on("sourcedata", function f(){ if(_pruneStates()) map.off("sourcedata", f); });
+}
+// EMPTY FEATURE STATES: MapLibre (5.24) keeps an entry for each feature id that once had a feature state, also after removeFeatureState (the entry
+// is {}), and each new tile of the source goes through all of these entries (initializeTileState -> updatePaintArrays). On noise-map's page, the
+// Traffic tab's colours left 2,505 such entries on the roads: about 126 ms for each two zooms (docs/design/tile_speed.md). This removes the empty
+// entries, and a source layer with none left, after MapLibre applies a removal. MapLibre's API has no call for it, so this wraps the private
+// coalesceChanges of its feature-state store, once for all sources; tests/test_overlay_tiles_browser.py fails when a MapLibre update breaks it.
+// -> true when it is on (or no source yet: false, call again)
+function _pruneStates(){
+  const tm = Object.values((map.style && (map.style.tileManagers || map.style.sourceCaches)) || {})[0];
+  if(!tm) return false;
+  const P = tm._state && Object.getPrototypeOf(tm._state);
+  if(!P || typeof P.coalesceChanges !== "function" || !("deletedStates" in tm._state)){
+    console.warn("roadstyle: this MapLibre has no coalesceChanges in its feature-state store; empty feature states stay (docs/design/tile_speed.md)");
+    return true;
+  }
+  if(P.__rsPrune) return true;
+  const own = P.coalesceChanges;
+  P.coalesceChanges = function(...a){
+    const removed = Object.keys(this.deletedStates || {});
+    own.apply(this, a);
+    for(const sl of removed){
+      const ids = this.state[sl]; if(!ids) continue;
+      for(const id in ids) if(!Object.keys(ids[id]).length) delete ids[id];
+      if(!Object.keys(ids).length) delete this.state[sl];
+    }
+  };
+  P.__rsPrune = true;
+  return true;
 }
 // the roads style, at the start or later (rs.setStyle: a page that adds the roads after a build, again for each network). No style yet:
 // no road layers, nothing to pick

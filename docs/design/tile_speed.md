@@ -345,8 +345,14 @@ page as built; "after" is the same page with the 1,225 `rs_ov_<i>` keys removed 
 `scripts/measure_tile_messages.py` makes a page of roads and many hidden overlays and counts the objects in each tile result. With 1,200
 hidden overlays: 21,422 objects for each `roads` tile before, 3,394 after.
 
-**What stays.** MapLibre keeps an entry for each feature id that once had a feature state, also after `removeFeatureState` (the entry is
-`{}`). Each new tile of the source then goes through all of these entries (`initializeTileState`, `updatePaintArrays`). On noise-map's page,
-the Traffic tab's colours leave 2,505 such entries on the roads: 126 ms of the two zooms above. The public API cannot remove the entries.
+**Empty feature states (2026-11-25).** MapLibre keeps an entry for each feature id that once had a feature state, also after `removeFeatureState`
+(the entry is `{}`). Each new tile of the source goes through all of these entries (`initializeTileState`, `updatePaintArrays`). On noise-map's
+page, the Traffic tab's colours left 2,505 such entries on the roads. MapLibre's API cannot remove them, so the dashboard wraps the private
+`coalesceChanges` of MapLibre's feature-state store, once for all sources (`core.js`, `_pruneStates`): after MapLibre applies a removal, the
+empty entries go, and a source layer with no entry left goes too. When a MapLibre update removes `coalesceChanges`, the page writes a warning in
+the console, and `tests/test_overlay_tiles_browser.py::test_a_cleared_feature_state_leaves_no_entry_that_each_new_tile_reads` fails.
+
+Measured on noise-map's page (built with the change above), the time in `initializeTileState` for the roads tiles of three zooms and a pan
+(2 runs): 181 to 189 ms with the 2,505 empty entries, 0 ms without them.
 
 **Rule.** Do not put a value in the global state that grows with the data (one key for each overlay, a map of ids). Use the feature state.
