@@ -378,7 +378,7 @@ fn three_d_check(fc: &Value, kind: &str, u: &Spec, hc: &str) -> Result<(), crate
     let fs = fc["features"].as_array().map_or(&[][..], Vec::as_slice);
     let bad = fs.iter().filter(|f| !f["properties"][hc].as_f64().is_some_and(|h| h.is_finite() && h >= 0.0)).count();
     if bad > 0 {
-        return Err(crate::error::column(hc, &format!("height_col: {bad} of {} features have no height in metres (a number of 0 or more) in this property", fs.len())));
+        return Err(crate::error::column(hc, format!("height_col: {bad} of {} features have no height in metres (a number of 0 or more) in this property", fs.len())));
     }
     Ok(())
 }
