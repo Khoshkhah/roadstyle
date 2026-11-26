@@ -1036,9 +1036,10 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
     - Numbers go in order: the columns from left to right, the rows from the bottom up. Text goes in the order of the rows.
     - A cell is a tile with a small gap and round corners. It shows its value when the value fits in the cell. The pointer on a cell shows its row, its column and its value.
     - The legend is one bar of the class colours, with the limits under the joins and the name of `z` at its end.
-    - The name of `y` is over the row labels. With more than 6 rows, every second row has a label. The name of `x` is under the column labels (with `group`: the group names).
+    - The name of `y` is over the row labels, and it can be wider than them. With more than 6 rows, every second row has a label. The name of `x` is under the column labels.
+    - With `group`, there are no column labels (the values of `x` in a group are often only an order). Each group has a line under its columns and its name under the line, on one of two lines. When the name does not fit, the group shows the last part of its name (`NE` of `front · NE`).
     - A marked column or row has a light band behind it and its label in a dark tag. A marked cell has a ring in the text colour.
-    - A column is at least 6 px wide. A grid that is wider than its box scrolls to the side, and the row labels stay. A row is at least 10 px high.
+    - The grid fits its box first: the gap between groups gets smaller (8 px to 2 px), then the columns (to 3 px). Only a grid that is wider than that scrolls to the side, and the row labels stay. A row is at least 10 px high.
     - A click on a cell calls `onPick(row)`. To move the frame to the cell, call `set({mark: ...})`.
 
     **A chart card from Python**

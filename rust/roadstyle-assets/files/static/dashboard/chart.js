@@ -308,19 +308,22 @@ export const rsChart = (() => {
       // the text of a cell on the page's colour #rrggbb: dark on a light colour, light on a dark one (a theme token cannot follow the page's colour)
       const ink = (c) => { const m = /^#([0-9a-f]{6})$/i.exec(c); if(!m) return "var(--ink)"; const n = parseInt(m[1], 16);
         return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.55 ? "#1a1a1a" : "#ffffff"; };
-      // the size: the row labels at the left, the columns share the rest (a gap between groups); a column of less than 6 px makes the grid wider than
-      // the box, and the box scrolls to the side; a row is at least 10 px, else the box scrolls down. Over the grid: the name of y; under it: the
-      // column labels, then the group names or the name of x
-      const G = 8, MINW = s.small ? 1 : 6, MINH = s.small ? 1 : 10;
-      const lw = s.small ? 0 : Math.min(120, 12 + 6.2 * Math.max(String(ys[0]).length, ...ry.map((r) => lab(r.y).length)));      // (the name of y over the labels too)
-      const gaps = cx.filter((c, j) => j && String(c.g) !== String(cx[j - 1].g)).length, top = s.small ? 0 : 16, bot = s.small ? 0 : 36;
-      const cw = Math.max(MINW, (W - lw - 4 - gaps * G) / Math.max(1, cx.length));
+      // the size: the row labels at the left, the columns share the rest. The grid fits the box first: the gap between groups gets smaller (8 px
+      // down to 2 px), then the columns (down to 3 px); only then the grid is wider than the box, and the box scrolls to the side. A row is at least
+      // 10 px, else the box scrolls down. Over the grid: the name of y (over the grid too, so the label column is as wide as the labels); under it:
+      // the column labels and the name of x, or with group the group names (the x values of a group are often only an order)
+      const MINW = s.small ? 1 : 3, MINH = s.small ? 1 : 10;
+      const lw = s.small ? 0 : Math.min(120, 12 + 6.2 * Math.max(1, ...ry.map((r) => lab(r.y).length)));
+      const gaps = cx.filter((c, j) => j && String(c.g) !== String(cx[j - 1].g)).length, top = s.small ? 0 : 4, bot = s.small ? 0 : 36, room0 = W - lw - 4, n = Math.max(1, cx.length);
+      const G = !gaps ? 0 : Math.max(2, Math.min(8, (room0 - n * 6) / gaps));
+      const cw = Math.max(MINW, (room0 - gaps * G) / n);
       const xs = []; let at0 = 0; cx.forEach((c, j) => { if(j && String(c.g) !== String(cx[j - 1].g)) at0 += G; xs.push(at0); at0 += cw; });
       const GW = Math.ceil(at0) + 4;
       // two drawings side by side: the row labels, and the grid in a box that scrolls to the side (its scrollbar takes height from the rows)
       const side = rsSvg(null, "svg", {width: lw, height: H, "aria-hidden": "true"}), wrapEl = document.createElement("div"), scroll = document.createElement("div");
       wrapEl.className = "rs-chart-hm"; scroll.className = "rs-chart-hscroll"; side.style.cssText = svg.style.cssText; side.style.width = lw + "px";
       svg.replaceWith(wrapEl); wrapEl.append(side, scroll); scroll.append(svg);
+      if(!s.small){ const yn = document.createElement("div"); yn.className = "rs-chart-yname"; yn.textContent = ys[0]; wrapEl.before(yn); H -= yn.offsetHeight; }
       svg.setAttribute("width", GW); svg.removeAttribute("preserveAspectRatio"); svg.style.width = GW + "px"; size(GW, 1);
       if(s.small) side.remove();
       const ch = Math.max(MINH, (H - (scroll.offsetHeight - scroll.clientHeight) - top - bot) / Math.max(1, ry.length));
@@ -351,17 +354,24 @@ export const rsChart = (() => {
         rsSvg(on, "text", {x: x0 + w / 2, y, "text-anchor": "middle", fill: "var(--bg)", "font-size": 10.5, "font-weight": 600}, text); };
       // the labels: as many as fit (a row label needs 12 px, and with more than 6 rows every second one; a column label its width)
       const ev = Math.max(ry.length > 6 ? 2 : 1, Math.ceil(12 / ch));
-      rsSvg(side, "text", {x: lw - 6, y: 10, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, ys[0]);
       ry.forEach((r, j) => { const y = top + ch * j + ch / 2 + 3.5;
         if(tagY.has(j)) tag(side, lw - 4, y, lab(r.y), "end"); else if((ry.length - 1 - j) % ev === 0) rsSvg(side, "text", {x: lw - 6, y, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, lab(r.y)); });
       const xe = Math.ceil((6.2 * Math.max(1, ...cx.map((c) => lab(c.x).length)) + 8) / cw);
-      cx.forEach((c, n) => { const x = xs[n] + cw / 2, near = [...tagX].some((t) => t !== n && Math.abs(xs[t] - xs[n]) < (lab(c.x).length * 6.2 + 16));
+      if(gi < 0) cx.forEach((c, n) => { const x = xs[n] + cw / 2, near = [...tagX].some((t) => t !== n && Math.abs(xs[t] - xs[n]) < (lab(c.x).length * 6.2 + 16));
         if(tagX.has(n)) tag(svg, x, yb + 15, lab(c.x)); else if(n % xe === 0 && !near) rsSvg(svg, "text", {x, y: yb + 15, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, lab(c.x)); });
-      if(gi >= 0) for(let a = 0; a < cx.length;){ let b = a; while(b + 1 < cx.length && String(cx[b + 1].g) === String(cx[a].g)) b++;
-        const span = xs[b] + cw - xs[a], name = lab(cx[a].g), fit = Math.floor((span - 4) / 6.2);
-        if(fit >= 2) rsSvg(svg, "text", {x: xs[a] + span / 2, y: yb + 31, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, name.length > fit ? name.slice(0, fit - 1) + "…" : name);
-        a = b + 1; }
-      else rsSvg(svg, "text", {x: at0, y: yb + 31, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, s.x);
+      // the groups: a thin line under the columns of each group, and its name on the first of two lines where it does not touch the last name there;
+      // a name that is wider than that: its last part ("NE" of "front · NE"); a group with no room for either has its line, and the hover names it
+      if(gi >= 0){ const ends = [-Infinity, -Infinity];
+        for(let a = 0; a < cx.length;){ let b = a; while(b + 1 < cx.length && String(cx[b + 1].g) === String(cx[a].g)) b++;
+          const x0 = xs[a], x1 = xs[b] + cw, mid = (x0 + x1) / 2, name = lab(cx[a].g), last = name.split(/\s*[·|\/,:\-–]\s*|\s+/).filter(Boolean).pop() || name;
+          rsSvg(svg, "line", {x1: x0 + 0.5, x2: x1 - 0.5, y1: yb + 3, y2: yb + 3, stroke: "var(--mut)", "stroke-width": 1.5, "stroke-linecap": "round"});
+          let done = false;
+          for(const t of name === last ? [name] : [name, last]){ const w = t.length * 6.2, lo = Math.max(0, Math.min(at0 - w, mid - w / 2));
+            for(const ln of [0, 1]) if(!done && lo >= ends[ln] + 6 && (w <= x1 - x0 + 2 * G + 12 || t === last)){
+              rsSvg(svg, "text", {x: lo + w / 2, y: yb + 16 + 13 * ln, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, t); ends[ln] = lo + w; done = true; }
+            if(done) break; }
+          a = b + 1; } }
+      if(gi < 0) rsSvg(svg, "text", {x: at0, y: yb + 31, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, s.x);
       // the pointer on a cell: its row, its column and its value, and a frame round it; a click gives its row
       const hov = rsSvg(svg, "rect", {width: cw + 1, height: ch + 1, rx: rr + 1, fill: "none", stroke: "var(--ink)", "stroke-width": 1.5, opacity: 0, "pointer-events": "none"});
       const under = (e) => { const i = e.target && e.target.getAttribute && e.target.getAttribute("data-i"); return i == null ? null : +i; };

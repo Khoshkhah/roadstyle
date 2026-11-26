@@ -350,7 +350,7 @@ def test_a_wide_heatmap_scrolls_to_the_side_and_keeps_its_row_labels(tmp_path):
     with pw.sync_playwright() as p:
         browser, page, errors = _page(p, tmp_path)
         try:
-            page.evaluate(_HEAT, [300, 90, {}])
+            page.evaluate(_HEAT, [300, 200, {}])                       # 200 columns of at least 3 px: wider than the box
             page.wait_for_timeout(80)
             m = page.evaluate("""() => { const sc = document.querySelector('#c .rs-chart-hscroll'); sc.scrollLeft = 200;
               return {wider: sc.scrollWidth > sc.clientWidth + 50, moved: sc.scrollLeft > 0, labels: document.querySelector('#c .rs-chart-hm > svg').querySelectorAll('text').length,
@@ -411,6 +411,36 @@ def test_the_legend_of_two_or_more_series_is_a_filter(tmp_path):
             assert page.evaluate(lines) == [three[1], three[2]]
             page.evaluate("C.set({kind: 'bar'})")                    # a bar keeps the hidden series hidden
             assert page.locator("#c svg path.rs-mk").count() == 48
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+_WALLS = """([w]) => { const el = document.createElement('div'); el.id = 'c'; el.style.cssText = `width:${w}px;height:330px`;
+  document.getElementById('sb').querySelector('.sb-body').prepend(el);
+  const names = ['front · S', 'front · SE', 'side · E', 'back · NE', 'back · N', 'side · NW', 'side · W', 'front · SW', 'court · S', 'court · E',
+                 'court · N', 'court · W', 'gable · E', 'gable · W', 'yard · S', 'yard · N', 'roof · S', 'roof · N', 'end · E', 'end · W'], rows = [];
+  let p = 0; names.forEach((g, k) => { for(let j = 0; j < (k < 7 ? 2 : 1); j++, p++) for(let h = 0; h < 15; h++) rows.push([p, 1.5 + 3 * h, g, 50 + (p + h) % 20]); });
+  window.C = rs.chart(el, {kind: 'heatmap', x: 'Place', y: 'Height (m)', z: 'dB', group: 'Wall', rows, breaks: [45, 50, 55, 60, 65, 70, 75],
+    columns: [{name: 'Place', type: 'BIGINT'}, {name: 'Height (m)', type: 'DOUBLE'}, {name: 'Wall', type: 'VARCHAR'}, {name: 'dB', type: 'DOUBLE'}]}); }"""
+
+
+def test_a_heatmap_of_many_small_groups_fits_and_names_its_groups(tmp_path):
+    """noise-map's façade (2026-11-26): 27 places in 20 walls and 15 heights in a 460 px panel. The grid fits the box (no side scroll); the label column is
+    as wide as its labels, not as the name of y; no column labels (the places are only an order); each wall has a line under its columns, and the walls
+    that have no room for their name show its last part ("NE")."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(_WALLS, [440])
+            page.wait_for_timeout(80)
+            m = page.evaluate("""() => { const sc = document.querySelector('#c .rs-chart-hscroll'), side = document.querySelector('#c .rs-chart-hm > svg');
+              const t = [...C.svg().querySelectorAll('text')].map(t => t.textContent);
+              return {fits: sc.scrollWidth <= sc.clientWidth + 1, side: side.getBoundingClientRect().width, lines: C.svg().querySelectorAll('line').length, t,
+                      yname: document.querySelector('#c .rs-chart-yname').textContent}; }""")
+            assert m["fits"] and m["side"] < 40 and m["yname"] == "Height (m)", m
+            assert m["lines"] == 20 and not any(x.isdigit() for x in m["t"]), m
+            assert "NE" in m["t"] and len(m["t"]) >= 12, m["t"]
         finally:
             browser.close()
     assert errors == [], errors

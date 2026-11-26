@@ -898,6 +898,7 @@ html.rs-phone .rs-chart[data-more]{-webkit-mask-image:linear-gradient(to bottom,
 .rs-chart-hm{flex:none;display:flex;min-width:0}      /* a heatmap: the row labels, and the grid in a box that scrolls to the side (chart.js) */
 .rs-chart-hm>svg{flex:none}
 .rs-chart-hscroll{flex:1 1 0;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) 47%,transparent) transparent}
+.rs-chart-yname{flex:none;color:var(--mut);font-size:10.5px;line-height:14px;white-space:nowrap}      /* the name of y over a heatmap's row labels: it can be wider than them */
 .rs-chart-scale{flex:1 1 100%;display:flex;align-items:flex-start;gap:8px;min-height:30px}      /* the legend of a heatmap: one bar of the class colours, the limits under the joins */
 .rs-chart-scale>div{position:relative;flex:0 1 280px;min-width:120px}
 .rs-chart-scale-bar{display:flex;height:9px;border-radius:3px;overflow:hidden}
