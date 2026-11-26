@@ -34,6 +34,9 @@ export const rsChart = (() => {
   const tick = (v) => { const a = Math.abs(v); if(a >= 1e15) return v.toExponential(1).replace("e+", "e").replace(".0e", "e");          // 1.2e18: an id range, say
     for(const [d, u] of [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) if(a >= d) return +(v / d).toFixed(1) + u;
     return fmt(v); };
+  // the width of a text in the chart's font, measured (a label column as wide as its labels)
+  let ctx2d = null;
+  const textWidth = (px) => (t) => { ctx2d = ctx2d || document.createElement("canvas").getContext("2d"); ctx2d.font = `${px}px system-ui, sans-serif`; return ctx2d.measureText(String(t)).width; };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
   const num = (v) => v == null || v === "" ? null : typeof v === "bigint" ? Number(v) : typeof v === "number" ? v : isFinite(+v) ? +v : null;
   const when = (v) => v == null ? null : typeof v === "number" || typeof v === "bigint" ? Number(v) : Date.parse(String(v).replace(" ", "T")) || null;
@@ -313,9 +316,12 @@ export const rsChart = (() => {
       // 10 px, else the box scrolls down. Over the grid: the name of y (over the grid too, so the label column is as wide as the labels); under it:
       // the column labels and the name of x, or with group the group names (the x values of a group are often only an order)
       const MINW = s.small ? 1 : 3, MINH = s.small ? 1 : 10;
-      const lw = s.small ? 0 : Math.min(120, 12 + 6.2 * Math.max(1, ...ry.map((r) => lab(r.y).length)));
+      // the label column: the width of the widest row label as the page draws it, and 5 px to the grid (no free space at its left)
+      const rowTag = [].concat(s.mark || []).some((m) => m.y != null && m.x == null);           // (a marked row has its label in a tag: 8 px more)
+      const tw = textWidth(10.5), lw = s.small ? 0 : Math.ceil(Math.min(120, 5 + (rowTag ? 8 : 0) + Math.max(6, ...ry.map((r) => tw(lab(r.y))))));
       const gaps = cx.filter((c, j) => j && String(c.g) !== String(cx[j - 1].g)).length, top = s.small ? 0 : 4, bot = s.small ? 0 : 36, room0 = W - lw - 4, n = Math.max(1, cx.length);
-      const G = !gaps ? 0 : Math.max(2, Math.min(8, (room0 - n * 6) / gaps));
+      // the gap between groups: a third of a column, from 2 to 8 px (the line under each group shows where it ends; many groups must not take the columns' width)
+      const G = !gaps ? 0 : Math.max(2, Math.min(8, room0 / (n + gaps / 3) / 3));
       const cw = Math.max(MINW, (room0 - gaps * G) / n);
       const xs = []; let at0 = 0; cx.forEach((c, j) => { if(j && String(c.g) !== String(cx[j - 1].g)) at0 += G; xs.push(at0); at0 += cw; });
       const GW = Math.ceil(at0) + 4;
@@ -330,6 +336,8 @@ export const rsChart = (() => {
       H = Math.ceil(top + ch * ry.length + bot); size(GW, H); side.setAttribute("height", H); side.style.height = H + "px";
       // a cell is a tile: a gap round it and round corners, when it is large enough
       const gp = Math.min(cw, ch) >= 8 ? 1.5 : Math.min(cw, ch) >= 4 ? 1 : 0, rr = Math.min(cw, ch) >= 8 ? 2 : 0, yb = top + ch * ry.length;
+      // a thin edge in the text colour at 16 % round a tile of 8 px or more: a pale class stays apart from a light card; a narrower tile keeps all its colour
+      const edge = !s.small && Math.min(cw, ch) - gp >= 8 ? {stroke: "color-mix(in srgb, var(--ink) 16%, transparent)", "stroke-width": 1} : {};
       // the marks: a column or a row is a light band behind its tiles and its label in a dark tag; a cell is a ring in the text colour round it
       const marks = [].concat(s.mark || []).map((m) => {
         const nx = m.x == null ? null : cx.findIndex((c) => String(c.x) === String(m.x) && (m.group == null || String(c.g) === String(m.group)));
@@ -342,20 +350,20 @@ export const rsChart = (() => {
       ry.forEach((r, j) => { const y = top + ch * j;
         cx.forEach((c, n) => { const i = cell.get(c.k + "\u0001" + r.k); if(i == null) return;
           const v = num(s.rows[i][zi]), f = cl[klass(v)], t = fmt(v);
-          rsSvg(svg, "rect", {x: xs[n] + gp / 2, y: y + gp / 2, width: Math.max(0.5, cw - gp), height: Math.max(0.5, ch - gp), rx: rr, fill: f, "data-i": i});
+          rsSvg(svg, "rect", {x: xs[n] + gp / 2, y: y + gp / 2, width: Math.max(0.5, cw - gp), height: Math.max(0.5, ch - gp), rx: rr, fill: f, "data-i": i, ...edge});
           if(!s.small && ch >= 12 && cw >= t.length * 6 + 4) rsSvg(svg, "text", {x: xs[n] + cw / 2, y: y + ch / 2 + 3.5, "text-anchor": "middle", fill: ink(f), "font-size": 10, "pointer-events": "none"}, t); }); });
       for(const {nx, ny} of marks) if(nx != null && ny != null){ const x = xs[nx], y = top + ch * ny;
         rsSvg(svg, "rect", {class: "rs-chart-mark", x: x - 1, y: y - 1, width: cw + 2, height: ch + 2, rx: rr + 2, fill: "none", stroke: "var(--ink)", "stroke-width": 2, "pointer-events": "none"});
         rsSvg(svg, "rect", {x: x + gp / 2 + 0.5, y: y + gp / 2 + 0.5, width: Math.max(0.5, cw - gp - 1), height: Math.max(0.5, ch - gp - 1), rx: rr, fill: "none", stroke: "var(--bg)", "stroke-width": 1, "pointer-events": "none"}); }
       if(s.small) return;
       // a label in a dark tag (a marked column or row)
-      const tag = (on, x, y, text, anchor) => { const w = text.length * 6.2 + 10, x0 = anchor === "end" ? x - w + 4 : x - w / 2;
+      const tag = (on, x, y, text, anchor) => { const w = text.length * 6.2 + 10, x0 = anchor === "end" ? x - w : x - w / 2;
         rsSvg(on, "rect", {x: x0, y: y - 11.5, width: w, height: 16, rx: 4, fill: "var(--ink)"});
         rsSvg(on, "text", {x: x0 + w / 2, y, "text-anchor": "middle", fill: "var(--bg)", "font-size": 10.5, "font-weight": 600}, text); };
       // the labels: as many as fit (a row label needs 12 px, and with more than 6 rows every second one; a column label its width)
       const ev = Math.max(ry.length > 6 ? 2 : 1, Math.ceil(12 / ch));
       ry.forEach((r, j) => { const y = top + ch * j + ch / 2 + 3.5;
-        if(tagY.has(j)) tag(side, lw - 4, y, lab(r.y), "end"); else if((ry.length - 1 - j) % ev === 0) rsSvg(side, "text", {x: lw - 6, y, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, lab(r.y)); });
+        if(tagY.has(j)) tag(side, lw - 1, y, lab(r.y), "end"); else if((ry.length - 1 - j) % ev === 0) rsSvg(side, "text", {x: lw - 5, y, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, lab(r.y)); });
       const xe = Math.ceil((6.2 * Math.max(1, ...cx.map((c) => lab(c.x).length)) + 8) / cw);
       if(gi < 0) cx.forEach((c, n) => { const x = xs[n] + cw / 2, near = [...tagX].some((t) => t !== n && Math.abs(xs[t] - xs[n]) < (lab(c.x).length * 6.2 + 16));
         if(tagX.has(n)) tag(svg, x, yb + 15, lab(c.x)); else if(n % xe === 0 && !near) rsSvg(svg, "text", {x, y: yb + 15, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, lab(c.x)); });

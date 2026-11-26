@@ -438,7 +438,13 @@ def test_a_heatmap_of_many_small_groups_fits_and_names_its_groups(tmp_path):
               const t = [...C.svg().querySelectorAll('text')].map(t => t.textContent);
               return {fits: sc.scrollWidth <= sc.clientWidth + 1, side: side.getBoundingClientRect().width, lines: C.svg().querySelectorAll('line').length, t,
                       yname: document.querySelector('#c .rs-chart-yname').textContent}; }""")
-            assert m["fits"] and m["side"] < 40 and m["yname"] == "Height (m)", m
+            assert m["fits"] and m["side"] < 32 and m["yname"] == "Height (m)", m
+            # the gap between walls is a third of a column at most: the tiles keep their width; a tile of 8 px or more has an edge, a narrower one none
+            tile = page.evaluate("+C.svg().querySelector('rect[data-i]').getAttribute('width')")
+            assert tile >= 8 and page.evaluate("C.svg().querySelector('rect[data-i]').getAttribute('stroke')"), tile
+            page.evaluate("document.getElementById('c').style.width = '300px'")
+            page.wait_for_timeout(150)
+            assert page.evaluate("C.svg().querySelector('rect[data-i]').getAttribute('stroke')") is None
             assert m["lines"] == 20 and not any(x.isdigit() for x in m["t"]), m
             assert "NE" in m["t"] and len(m["t"]) >= 12, m["t"]
         finally:
