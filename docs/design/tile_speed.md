@@ -317,3 +317,36 @@ Street View use the list.
 | Dash layers alone | -14 % | -9 % | -8 % | -9 % | 0.97 % |
 
 The MLT and MVT tiles give the same pixels. The tiles do not change (the same bytes).
+
+## The global state in each tile (2026-11-25)
+
+**The cause.** MapLibre 5.24 keeps a reference to the map's whole global state in each style expression (`_globalState`), and its worker
+sends each data-driven paint expression with each bucket of each tile. The main thread then unpacks each copy (`deserialize`) before the
+tile shows. Each binder has two copies (the expression and its wrapper). The page had one global state `rs_ov_<i>` for each overlay
+(its `rsColor` colours, `{}` at the start), so the cost of a tile grew with the number of overlays, also of overlays that are hidden.
+
+**The change.** `rsColor(ids, color, overlay)` sets the feature state `rs_c` on the overlay's features (`dashboard/overlays.js`, `_ovColor`),
+and the overlay's colour paint reads it (`layers/build.rs`, `overlay_colours`; only in a live style: a baked style has no `rsColor`). The page has no global state for each overlay. A lazy
+overlay gets its colours again each time that it shows, because its source, and the feature state, leave the map when it hides.
+
+**Measured** on noise-map's page (1,224 overlays, `tiles=True`, `lazy_overlays=True`; headless Chromium with SwiftShader). "Before" is the
+page as built; "after" is the same page with the 1,225 `rs_ov_<i>` keys removed and the overlay paint changed to the feature state.
+
+| | Before | After |
+|---|---|---|
+| Global state keys | 1,239 | 14 |
+| Objects in each `roads` tile result (zoom 18 to 16 to 14) | about 87,000 | about 15,000 |
+| Objects in each tile result of one noise overlay | about 6,900 | about 200 |
+| Main-thread long tasks, zoom out 18 to 16 (3 runs) | 219 to 240 ms | 0 ms |
+| Main-thread long tasks, zoom out 16 to 14 | 301 to 395 ms | 0 ms |
+| Main-thread long tasks, pan 500 px | 104 to 114 ms | 0 ms |
+| CPU profile of the two zooms: `Actor.receive` / `deserialize` | 836 / 475 ms | 128 / 55 ms |
+
+`scripts/measure_tile_messages.py` makes a page of roads and many hidden overlays and counts the objects in each tile result. With 1,200
+hidden overlays: 21,422 objects for each `roads` tile before, 3,394 after.
+
+**What stays.** MapLibre keeps an entry for each feature id that once had a feature state, also after `removeFeatureState` (the entry is
+`{}`). Each new tile of the source then goes through all of these entries (`initializeTileState`, `updatePaintArrays`). On noise-map's page,
+the Traffic tab's colours leave 2,505 such entries on the roads: 126 ms of the two zooms above. The public API cannot remove the entries.
+
+**Rule.** Do not put a value in the global state that grows with the data (one key for each overlay, a map of ids). Use the feature state.

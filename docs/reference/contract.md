@@ -149,7 +149,6 @@ such `state` block) has no step of its own (`core.js`, `_useState`).
 | `rs_bridges3d` | bool | on (a page with decks, `view_3d`) | | the filters of the flat bridge (off: at every zoom) and of the 3D decks; the mesh (`bridgemesh.js`) | the Roads box row "3D bridges" | `rsSetBridges3D`; `rs:bridges3dchange` |
 | `rs_terrain_tunnel` | number | `1` | | a tunnel piece's opacity factor (fill, gap, dashes; only a style with tunnels reads it): `1`, the fade (`ontop.terrain.tunnel_fade`) or `0` while the 3D terrain is on | `terrain_tunnels=`, the terrain switch | `rsTerrainTunnels`; `rs:terrainchange` |
 | `rs_theme` | text | `"light"` | | every colour of a layer: its dark colour (`"dark"`) or its light one, with the casing of the roads, the base map's layers, the names and the arrows | the dashboard's theme switch | `rsSetTheme`; `rs:themechange` ([the dark theme](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/dark_theme.md)) |
-| `rs_ov_<i>` | object: feature id to color | `{}` | colors | the paint of overlay `i` | host page | `rsColor(..., overlay)` |
 | `rs_palette` | text | the start palette | the palettes that the views name | each color that differs between these palettes (`__rs_fill@<palette>` and the paint values) | View menu | `rsSetView`; `rs:viewselect` |
 | `rs_tun_strength` | number | profile `tunnels.strength` (60) | 0 to 100 (`steps`) | each tunnel color | Tunnels box | `rsSetTunnelStyle`; `rs:tunnelchange` |
 | `rs_tun_toward` | color | palette `tunnels.toward` (Sand `#d6cfc4`) | `towards`, or any `#rrggbb` | the same | Tunnels box | the same |
@@ -166,6 +165,7 @@ not global state: the dashboard sets them on each road with `setFeatureState`.
 |---|---|---|---|
 | `select`, `hover` | bool | the glow of a selected or hovered road | a click, the pointer, `rsSelect`, `rsHighlight(ids)` |
 | `rs_c`, `rs_w` | colour, number | the road's colour and width factor (`roadstyle:live`) | `rsColor`, `rsColorBase`, `rs.setData` |
+| `rs_c` on an overlay's feature | colour | the colour of the overlay's feature (its source and source layer, not the road's) | `rsColor(ids, color, overlay)` |
 | `rs_hl`, `rs_hlo` | colour, number | the colour and the opacity of a highlight set. It is over the select and hover glow. No `rs_hlo`: the look's `selection.opacity` | `rsHighlight(ids, {set, color, opacity})` |
 
 ## The feature properties `__rs_*`

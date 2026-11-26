@@ -114,7 +114,7 @@ fn look_half(look: &Look, roads: &Roads, simple: &simple::SimpleSource, slots: &
     // and the style says what the controls show
     let live = look.map.output.state == roadstyle_look::options::State::Live;
     let (contract, state) = if live {
-        let st = contract::page_state(look, colors.active, ovs.len());
+        let st = contract::page_state(look, colors.active);
         (Some((contract::controls(look, roads, info, colors.active)?, st.clone())),
          Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
     } else { (None, None) };

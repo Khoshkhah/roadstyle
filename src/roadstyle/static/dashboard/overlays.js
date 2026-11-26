@@ -108,7 +108,24 @@ function _ovLazyAdd(ov){
     const i = order.indexOf(l.id), before = order.slice(i + 1).find(id => map.getLayer(id));
     map.addLayer({...l, layout: {...(l.layout || {}), visibility: "visible"}}, before);
   }
+  _ovPaint(ov, true);   // its colours from rsColor: a new source has no feature state
 }
+// AN OVERLAY'S COLOURS (rsColor(ids, color, overlay)): the feature state rs_c of each id, which the overlay's colour paint reads (layers/build.rs
+// overlay_colours). Not a global state: MapLibre copies the whole global state into each tile that a worker sends (docs/design/tile_speed.md).
+// The ids are kept here, because a lazy overlay's source, and its feature state, goes when it hides.
+const _ovC = {};   // label -> {ids, color}
+function _ovPaint(ov, on){
+  const c = _ovC[ov.label], id = c && _ovAllLayers(ov)[0], l = id && map.getLayer(id);
+  if(!l) return;
+  const r = l.sourceLayer ? {source: l.source, sourceLayer: l.sourceLayer} : {source: l.source};
+  for(const i of c.ids) on ? map.setFeatureState({...r, id: i}, {rs_c: c.color}) : map.removeFeatureState({...r, id: i}, "rs_c");
+}
+export function _ovColor(ov, ids, color){
+  if(_ovC[ov.label]){ _ovPaint(ov, false); delete _ovC[ov.label]; }
+  if(ids){ _ovC[ov.label] = {ids, color}; _ovPaint(ov, true); }
+}
+// a new style (rs.setStyle) has new sources, with no feature state
+export function _ovColorsAgain(){ for(const ov of OVERLAYS) if(_ovC[ov.label]) _ovPaint(ov, true); }
 function _ovLazyRemove(ov){
   const z = _ovLazyOf(ov);
   if(!z || !map.getSource(ov.source)) return;

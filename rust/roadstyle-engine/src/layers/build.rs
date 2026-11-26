@@ -617,15 +617,17 @@ fn state_expressions(cx: &Ctx, layers: &mut [Value], fills: &[String]) {
     }
 }
 
-/// An overlay's colours set by rsColor (state rs_ov_<i>).
+/// An overlay's colours set by rsColor: the feature state rs_c of each feature (dashboard/overlays.js `_ovColor`). Not a global state: MapLibre
+/// 5.24 copies the whole global state into each data-driven paint expression of each tile that a worker sends, and the main thread unpacks
+/// each copy. A key for each overlay made each tile of a page of 1,224 overlays about 90,000 objects larger (docs/design/tile_speed.md).
 fn overlay_colours(layers: &mut [Value], ov_ids: &[Vec<String>]) {
-    for (i, ids) in ov_ids.iter().enumerate() {
+    for ids in ov_ids {
         for l in layers.iter_mut().filter(|l| l["id"].as_str().is_some_and(|x| ids.iter().any(|y| y == x))) {
             let t = l["type"].as_str().unwrap_or("").to_string();
             if matches!(t.as_str(), "line" | "fill" | "circle") {
                 let k = format!("{t}-color");
                 if let Some(c) = l["paint"].get(&k).cloned() {
-                    l["paint"][&k] = json!(["coalesce", ["get", ["to-string", ["id"]], gs(&format!("rs_ov_{i}"))], c]);
+                    l["paint"][&k] = json!(["coalesce", ["feature-state", "rs_c"], c]);
                 }
             }
         }
@@ -731,7 +733,9 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     fill_switch(&mut layers, &mut info);
     let edge_ids = place_overlays(&mut layers, ov.edge, ov.over);
     state_expressions(&cx, &mut layers, fills);
-    overlay_colours(&mut layers, &ov.ids);
+    if cx.look.map.output.state == roadstyle_look::options::State::Live {      // a baked style has no dashboard and no rsColor
+        overlay_colours(&mut layers, &ov.ids);
+    }
     if cx.any_tunnel {
         tunnel_look(&cx, &mut layers, &edge_ids, &mut info);
     }
@@ -739,7 +743,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     if items.is_empty() {
         layers = layers.into_iter().flat_map(|l| if l["id"] == "roads-simple" { super::dash::split_dash(l) } else { vec![l] }).collect();
     }
-    let state = crate::contract::page_state(look, active, ovs.len());       // the page's start values, baked in `finish`
+    let state = crate::contract::page_state(look, active);       // the page's start values, baked in `finish`
     let out = finish(&cx, layers, &state, ovs);
     Ok((if ovs.is_empty() { out } else { restyle(out, ovs) }, info))
 }

@@ -17,7 +17,7 @@ pub const CONTRACT: i64 = roadstyle_model::props::CONTRACT;
 const ACCESS: [(&str, &str); 4] = [("private", "Private roads"), ("bus", "Bus lanes"), ("pedestrian", "Pedestrian streets"), ("delivery", "Delivery only")];
 
 /// The page's global state and the start value of each, in a fixed order. `active`: the colour option.
-pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<String, Value> {
+pub fn page_state(look: &crate::Look, active: usize) -> Map<String, Value> {
     let tu = &look.sections.tunnels;
     let pair = tu.pair();
     let dash = &tu.to["dash"];
@@ -28,9 +28,6 @@ pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<S
         "rs_tun_strength": tu.strength.f(), "rs_tun_toward": tu.toward_color(), "rs_tun_two": pair.is_some(),
         "rs_tun_c0": pair.map_or(dash, |p| &p[0]), "rs_tun_c1": pair.map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
         .as_object().unwrap().clone();
-    for i in 0..n_overlays {
-        state.insert(format!("rs_ov_{i}"), json!({}));
-    }
     // a palette made in code has no name
     let palette = look.palette.as_str();
     state.insert("rs_palette".into(), palette.into());
