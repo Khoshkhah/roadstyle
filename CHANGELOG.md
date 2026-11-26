@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-21
+
 ### Added
 
 - **Your own 3D buildings: `rs.Overlay(..., height_col=, base_col=)`.** An overlay of polygons with a height column becomes the page's own 3D buildings. The toolbox's buildings button shows them. While they show, the base map's 3D buildings are hidden, and the footprints and their clicks stay. With the 3D terrain on, they stand on the page's ground. Each feature must have a height of 0 m or more, else the page is not made (an error). For noise-map, so that the dashboard shows the blocks of its noise model (a building and its parts). Docs: [Your own 3D buildings](docs/guides/overlays.md#your-own-3d-buildings). Test: `tests/test_overlay_3d_browser.py`.
