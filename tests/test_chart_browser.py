@@ -338,7 +338,7 @@ def test_a_heatmap_colours_each_cell_by_its_class_and_a_click_gives_its_row(tmp_
                       legend: document.querySelector('#c .rs-chart-legend').innerText, wide: s.getBoundingClientRect().width <= document.getElementById('c').clientWidth}; }""")
             assert m["cells"] == 8 * 6 - 1 and m["fill"] == "#cfe8c8" and m["low"], m          # 42 dB: under 45
             assert "front" in m["text"] and "back" in m["text"] and "43" in m["text"], m["text"]
-            assert m["marks"] == 2 and m["wide"] and "< 45" in m["legend"] and "≥ 75" in m["legend"], m
+            assert m["marks"] == 2 and m["wide"] and m["legend"].split() == ["45", "50", "55", "60", "65", "70", "75", "dB"], m
             page.locator("#c svg rect[data-i]").first.click()
             assert len(page.evaluate("picked")) == 1
         finally:
@@ -381,6 +381,36 @@ def test_y_range_fits_the_axis_to_the_values(tmp_path):
             page.evaluate("C.set({kind: 'bar', x: 'hour', y_range: 'data'})")
             assert page.evaluate(lowest) == 0
             assert page.evaluate(_INSIDE)["out"] == 0
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_the_legend_of_two_or_more_series_is_a_filter(tmp_path):
+    """A click on a series in the legend hides it and a second click shows it (2026-11-26); the series keep their colours, the y axis fits the series that
+    show, and the last series stays."""
+    cols = [{"name": "hour", "type": "BIGINT"}, {"name": "weekday", "type": "DOUBLE"}, {"name": "saturday", "type": "DOUBLE"}, {"name": "sunday", "type": "DOUBLE"}]
+    rows = [[h, 60 + h, 50 + h, 40 + h] for h in range(24)]
+    lines = "() => [...C.svg().querySelectorAll('polyline')].map(l => l.getAttribute('stroke'))"
+    key = "#c .rs-chart-legend .rs-chart-key"
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(_DRAW, ["line", "hour", ["weekday", "saturday", "sunday"], cols, rows, 400])
+            page.evaluate("C.set({y_range: 'data'})")
+            three = page.evaluate(lines)
+            page.locator(key).nth(1).click()
+            assert page.evaluate(lines) == [three[0], three[2]]
+            assert page.get_attribute(f"{key}:nth-child(2)", "aria-pressed") == "false"
+            page.locator(key).nth(0).click()
+            assert page.evaluate(lines) == [three[2]]
+            assert page.evaluate("Math.max(...[...C.svg().querySelectorAll('text')].filter(t => t.getAttribute('text-anchor') === 'end').map(t => +t.textContent))") < 70
+            page.locator(key).nth(2).click()                          # the last series stays
+            assert page.evaluate(lines) == [three[2]]
+            page.locator(key).nth(1).press("Enter")
+            assert page.evaluate(lines) == [three[1], three[2]]
+            page.evaluate("C.set({kind: 'bar'})")                    # a bar keeps the hidden series hidden
+            assert page.locator("#c svg path.rs-mk").count() == 48
         finally:
             browser.close()
     assert errors == [], errors

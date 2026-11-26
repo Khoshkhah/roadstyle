@@ -1009,6 +1009,7 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
     - The series colours are `--rs-chart-1` to `--rs-chart-8`, checked for colour vision deficiency in both themes.
     - `title` (or `false`), `count`, `small`, `head`; `set(change)`, `spec()`, `svg()`, `destroy()`.
     - The pointer on a mark shows its values. A click calls `onPick(row)`.
+    - The legend of a line or a bar of two or more series is a filter: a click on a series (or Enter) hides it, and a second click shows it. The last series stays. The series keep their colours, and the y axis fits the series that show.
     - `y_range` (line, bar): `"data"` fits the y axis to the values (a line only; a bar always starts at 0). `[lo, hi]` makes the y axis cover at least `lo` to `hi` (`null`: that end fits the values). The axis always covers every value, and its ends are nice ticks. With no `y_range`, the axis starts at 0.
 
     **A heatmap**
@@ -1033,8 +1034,10 @@ The icons of `data-icon`: `car`, `gauge`, `volume`, `chart`, `clock`, `map`, `li
     | `mark` | none | A frame on a cell `{x, y}`, a column `{x}` or a row `{y}`, or a list of them. With `group`, `{x, group}` is the column of that group |
 
     - Numbers go in order: the columns from left to right, the rows from the bottom up. Text goes in the order of the rows.
-    - A cell shows its value when the value fits in the cell. The pointer on a cell shows its row, its column and its value.
-    - The legend shows the classes: `< 45`, `45–50`, …, `≥ 75`.
+    - A cell is a tile with a small gap and round corners. It shows its value when the value fits in the cell. The pointer on a cell shows its row, its column and its value.
+    - The legend is one bar of the class colours, with the limits under the joins and the name of `z` at its end.
+    - The name of `y` is over the row labels. With more than 6 rows, every second row has a label. The name of `x` is under the column labels (with `group`: the group names).
+    - A marked column or row has a light band behind it and its label in a dark tag. A marked cell has a ring in the text colour.
     - A column is at least 6 px wide. A grid that is wider than its box scrolls to the side, and the row labels stay. A row is at least 10 px high.
     - A click on a cell calls `onPick(row)`. To move the frame to the cell, call `set({mark: ...})`.
 
