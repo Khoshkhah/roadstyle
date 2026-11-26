@@ -66,6 +66,29 @@ def test_rscolor_paints_an_overlay_with_feature_state_and_the_page_has_no_state_
     assert errors == []
 
 
+def test_a_cleared_feature_state_leaves_no_entry_that_each_new_tile_reads(tmp_path):
+    """MapLibre keeps an entry for each feature id that once had a feature state, also after removeFeatureState, and each new tile goes through all
+    of them. The dashboard removes the empty entries (core.js _pruneStates, a wrap of MapLibre's private coalesceChanges): this test fails when a
+    MapLibre update breaks the wrap (docs/design/tile_speed.md)."""
+    path = tmp_path / "p.html"
+    rs.render_dashboard(_edges(), basemap="blank").save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            # the entries of the roads' feature states, by source layer
+            page.evaluate("""window.__fs = () => { const l = map.getStyle().layers.find(l => l['source-layer'] === 'simple');
+                return Object.fromEntries(Object.entries(map.style.tileManagers[l.source]._state.state).map(([k, v]) => [k, Object.keys(v).length])); }""")
+            page.evaluate("rsColor([0, 1, 2], '#ff0000')")
+            page.wait_for_function("__fs().simple === 3", timeout=5_000)
+            page.evaluate("rsColor([1], '#00ff00')")                       # rows 0 and 2 lose their colour: their entries go
+            page.wait_for_function("__fs().simple === 1", timeout=5_000)
+            page.evaluate("rsColor(null)")
+            page.wait_for_function("!('simple' in __fs())", timeout=5_000)
+        finally:
+            browser.close()
+    assert errors == []
+
+
 def test_a_hidden_overlay_has_its_own_source_and_loads_no_tile_until_it_shows(tmp_path):
     """An overlay that starts hidden is a vector source of its own with its own archive (docs/design/tiling.md): MapLibre asks for a source's tiles
     only while one of its layers shows, so a hidden overlay costs a map move nothing. Shown, it draws, and a click selects it. An overlay that
