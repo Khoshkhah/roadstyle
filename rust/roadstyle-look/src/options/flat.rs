@@ -143,6 +143,7 @@ const COLOR_OPTION: &[(&str, &str)] = &[("color_by", "by"), ("colors", "colors")
 /// The fields of rs.Overlay that are one field each of `Overlay`: (field, the field's path).
 const OVERLAY: &[(&str, &str)] = &[
     ("label", "label"), ("fc", "data"), ("kind", "kind"), ("placement", "placement"), ("color", "color"), ("color_col", "color_column"),
+    ("height_col", "height_column"), ("base_col", "base_column"),
     ("outline", "outline"), ("opacity", "opacity"), ("width", "width"), ("width_m", "width_m"), ("radius", "radius"), ("dash", "dash"),
     ("popup", "popup"), ("popup_window", "popup_window"), ("tooltip", "tooltip"), ("visible", "visible"), ("min_zoom", "min_zoom"),
     ("max_zoom", "max_zoom"), ("select", "select"), ("style", "style"), ("edge_col", "edge.column"), ("order_col", "edge.order_column"),

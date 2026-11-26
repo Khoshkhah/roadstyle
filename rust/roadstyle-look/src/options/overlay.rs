@@ -18,6 +18,10 @@ pub struct Overlay {
     pub color: Option<Color>,
     /// the property with a colour for each feature (null: `color`)
     pub color_column: Option<String>,
+    /// polygons: the property with each feature's height in metres. The overlay is then the page's own 3D buildings (the toolbox's buildings button)
+    pub height_column: Option<String>,
+    /// with `height_column`: the property with each feature's base in metres (null: 0, on the ground)
+    pub base_column: Option<String>,
     pub outline: Option<Color>,
     pub opacity: Option<f64>,
     pub width: Option<f64>,

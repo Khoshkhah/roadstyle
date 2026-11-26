@@ -378,6 +378,9 @@ pub struct OverlayLook {
     pub text_padding: Num,
     pub text_halo_width: Num,
     pub item_overlap_px: Num,
+    /// the opacity of an overlay's 3D blocks (height_col); a look from before 2026-11-26 has none: MapLibre's own (1)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extrude_opacity: Option<Num>,
     pub color: Color,
     pub circle_stroke: Color,
     pub fill_opacity: Num,

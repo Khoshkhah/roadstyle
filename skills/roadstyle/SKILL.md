@@ -125,6 +125,7 @@ rs.render_dashboard(edges, color_options={"Road class": {}}, dashboard={"panel":
 - Put page JS in `rs.ready(fn)`: the event `rs:ready` fires once, and a listener added after it never runs.
 - There is no `theme=` keyword. The page starts light; to start dark: `page_script="rs.ready(() => rsSetTheme('dark'))"`.
 - An overlay's colour is a text, never a MapLibre expression; a colour for each feature is `color_col=`.
+- Your own 3D buildings (blocks with your heights): `rs.Overlay(polygons, height_col="h", base_col="b")`. The toolbox's buildings button shows them in place of the base map's.
 - A click on a road, hover and tooltip are separate switches (`road_popup`, `road_tooltip`, `hover_color`).
 - Docs: `docs/reference/parameters.md` ("Dashboard options": every key), `docs/guides/dashboards.md` (the panel, its sections, the click), `docs/guides/dashboard-layout.md` (the frame and the toolbox), `docs/reference/javascript.md` (`rs.sections`, events).
 

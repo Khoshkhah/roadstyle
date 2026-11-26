@@ -47,6 +47,9 @@ class Overlay:
         the road layer's ``tooltip`` vs ``road_popup``). ``None``/``[]`` = hover only highlights.
     select : with ``edge_col``, what a hover or click on a feature picks: ``"road"`` (default) its road (the road's highlight, popup and
         ``rs:select``), ``"item"`` the feature itself (its own highlight and popup; ``rs:select`` carries it as ``item`` next to its road).
+    height_col / base_col : polygons in 3D, the page's own 3D buildings (docs/guides/overlays.md): ``height_col`` names the property with each
+        feature's height in metres (a number of 0 or more in every feature, else an error), ``base_col`` the one with its base (null: 0). The toolbox's
+        buildings button shows them, and the buildings of the base map are then hidden. With the 3D terrain on, they stand on the ground.
     width_m_col / offset_m_col : with ``edge_col`` and line features, in simple mode: the items are drawn IN the one road layer at their edge's
         fill (docs/design/edge_items.md), each with its own width and line-offset in metres from these properties (the width else ``width_m``).
     """
@@ -66,6 +69,8 @@ class Overlay:
     edge_col: str | None = None        # the property with the id of the feature's edge: drawn at its edge's fill number (docs/design/edge_overlays.md)
     order_col: str | None = None       # with edge_col: the property with the feature's order (whole number, lower first; null = 0)
     color_col: str | None = None       # the property with a CSS colour per feature (null / missing: ``color``)
+    height_col: str | None = None      # polygons: the property with each feature's height in metres; the overlay is then the page's 3D buildings
+    base_col: str | None = None        # with height_col: the property with each feature's base in metres (null: 0)
     style: str | None = None           # the name of a style in the settings ``config.overlays.styles`` (docs/design/overlay_styles.md); an argument given here wins over its field
     width_m: float | None = None       # a line's (or outline's) width in METRES, exact from ``min_zoom`` on; replaces ``width``
     dash: list | None = None           # a line's dash pattern, in line widths: [3, 3]

@@ -421,6 +421,7 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `order_col` | `None` | with `edge_col`: the property with the feature's order (whole number, lower first; null = 0) |
 | `select` | `"road"` | with `edge_col`: a hover or click picks the feature's road (`"road"`) or the feature itself (`"item"`: its own highlight and popup, `rs:select` with `item` and the road); anything else is an error |
 | `color_col` | `None` | the property with a colour per feature (null: `color`) |
+| `height_col` / `base_col` | `None` | polygons in 3D, the page's own 3D buildings: the property with each feature's height in metres (a number of 0 or more in every feature, else an error) and the one with its base (null: 0). The toolbox's buildings button shows them; the base map's 3D buildings are then hidden. Not with `edge_col` (the guide: [Overlays](../guides/overlays.md#your-own-3d-buildings)) |
 | `width_m` | `None` | a line's width in metres, exact from `min_zoom` on (replaces `width`) |
 | `dash` | `None` | a line's dash pattern in line widths, `[3, 3]` |
 | `min_zoom` / `max_zoom` | `None` | the zooms in which the overlay is drawn |

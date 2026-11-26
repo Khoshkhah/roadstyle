@@ -343,6 +343,9 @@ pub fn user_overlays(specs: &[Spec], first: usize) -> Result<Vec<Overlay>, crate
         if kind == "text" && u.text.as_ref().and_then(|t| t.column.as_ref()).is_none() {
             return Err(crate::error::options("an overlay of kind 'text' needs text_col (the property that holds the text)"));
         }
+        if let Some(hc) = u.height_column.as_deref() {
+            three_d_check(&fc, kind, u, hc)?;
+        }
         if let Some(wm) = u.width_m {
             for f in fc["features"].as_array_mut().into_iter().flatten() {
                 let lat = first_point(&f["geometry"]["coordinates"]).and_then(|p| p[1].as_f64()).unwrap_or(0.0);
@@ -361,6 +364,23 @@ pub fn user_overlays(specs: &[Spec], first: usize) -> Result<Vec<Overlay>, crate
                            edge_id_col: None, clickable: None, kinds: Vec::new(), tooltip_on: None, popup_on: None, edge_groups: None });
     }
     Ok(out)
+}
+
+/// An overlay with height_col (the page's own 3D buildings): polygons, not on the streets, and a height of 0 m or more in each feature. A
+/// feature with no height is an error, not a flat block: the page must give the heights it means.
+fn three_d_check(fc: &Value, kind: &str, u: &Spec, hc: &str) -> Result<(), crate::Error> {
+    if kind != "fill" {
+        return Err(crate::error::options(format!("height_col={hc:?}: a 3D overlay needs polygons (kind 'fill'), and this overlay is of kind '{kind}'")));
+    }
+    if u.edge.as_ref().is_some_and(|e| !e.column.is_empty()) {
+        return Err(crate::error::options(format!("height_col={hc:?}: an overlay on the streets (edge_col) cannot be in 3D")));
+    }
+    let fs = fc["features"].as_array().map_or(&[][..], Vec::as_slice);
+    let bad = fs.iter().filter(|f| !f["properties"][hc].as_f64().is_some_and(|h| h.is_finite() && h >= 0.0)).count();
+    if bad > 0 {
+        return Err(crate::error::column(hc, &format!("height_col: {bad} of {} features have no height in metres (a number of 0 or more) in this property", fs.len())));
+    }
+    Ok(())
 }
 
 /// A colour of the map options as the style writes it (its text), or null.
@@ -455,11 +475,23 @@ pub fn overlay_layers(sid: &str, ov: &Overlay, look: &crate::Look) -> Vec<Value>
             }
             vec![layer(format!("{sid}-text"), "symbol", true, Value::Object(layout), paint, false)]
         }
-        "fill" => vec![
-            layer(format!("{sid}-fill"), "fill", false, lay.clone(), pm(json!({"fill-color": col, "fill-opacity": op(&c.fill_opacity)})), false),
-            layer(format!("{sid}-outline"), "line", false, lay,
-                  pm(json!({"line-color": or(&ov.outline, &base), "line-width": width, "line-opacity": c.outline_opacity})), true),
-        ],
+        "fill" => {
+            let mut ls = vec![
+                layer(format!("{sid}-fill"), "fill", false, lay.clone(), pm(json!({"fill-color": col, "fill-opacity": op(&c.fill_opacity)})), false),
+                layer(format!("{sid}-outline"), "line", false, lay,
+                      pm(json!({"line-color": or(&ov.outline, &base), "line-width": width, "line-opacity": c.outline_opacity})), true),
+            ];
+            // height_col: the page's own 3D buildings, hidden until the buildings button shows them (features.js); the flat fill stays as the footprint
+            if let Some(hc) = u.and_then(|u| u.height_column.as_deref()) {
+                let bottom = u.and_then(|u| u.base_column.as_deref()).map_or(json!(0), |b| json!(["coalesce", ["get", b], 0]));
+                let mut paint = pm(json!({"fill-extrusion-color": col, "fill-extrusion-height": ["get", hc], "fill-extrusion-base": bottom}));
+                if let Some(o) = &c.extrude_opacity {
+                    paint.insert("fill-extrusion-opacity".into(), json!(o));
+                }
+                ls.push(layer(three_d_id(sid), "fill-extrusion", false, json!({"visibility": "none"}), paint, false));
+            }
+            ls
+        }
         "circle" => vec![layer(format!("{sid}-circle"), "circle", false, lay,
                                pm(json!({"circle-radius": radius, "circle-color": col, "circle-opacity": op(&c.circle_opacity),
                                          "circle-stroke-color": or(&ov.outline, &json!(c.circle_stroke)),
@@ -471,6 +503,11 @@ pub fn overlay_layers(sid: &str, ov: &Overlay, look: &crate::Look) -> Vec<Value>
                        pm(json!({"line-color": col, "line-width": width, "line-opacity": op(&c.line_opacity)})), true)]
         }
     }
+}
+
+/// The id of an overlay's 3D layer: the same as a base-map layer's (`ov{i}-3d`), so the page treats both as 3D buildings.
+pub fn three_d_id(sid: &str) -> String {
+    format!("{sid}-3d")
 }
 
 /// _eid: an edge id as text, the same for an integer, a float with a whole value and a text (ids past 2**53 match).

@@ -4,10 +4,12 @@
 import {map, OVERLAYS, RS_PREFIX, _emit, _ovAsk} from "./core.js";
 import {_ownOpacity} from "./basemap.js";
 let _b3d = [], _b3dOn = false;     // the overlays with a 3D layer (ov.extrude), the switch
-// a 3D layer shows while the switch is on and its overlay (the buildings) is shown
+// a 3D layer shows while the switch is on and its overlay (the buildings) is shown. The page's own 3D blocks (rs.Overlay height_col) replace the
+// base map's 3D buildings, as they replace a vector style's: the base map's footprints and their clicks stay
 function _show3d(){
+  const own = _b3d.some(ov => !ov.base_map && ov.visible !== false);       // hidden in the Layers box: the base map's come back
   _b3d.forEach(ov => { if(map.getLayer(ov.extrude))
-    map.setLayoutProperty(ov.extrude, "visibility", _b3dOn && ov.visible !== false ? "visible" : "none"); });
+    map.setLayoutProperty(ov.extrude, "visibility", _b3dOn && ov.visible !== false && !(own && ov.base_map) ? "visible" : "none"); });
   if(_b3dOn) _over3d();
   _ownOpacity();
 }
