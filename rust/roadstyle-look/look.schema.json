@@ -1172,6 +1172,22 @@
           ],
           "default": null
         },
+        "height_column": {
+          "description": "polygons: the property with each feature's height in metres. The overlay is then the page's own 3D buildings (the toolbox's buildings button)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "base_column": {
+          "description": "with `height_column`: the property with each feature's base in metres (null: 0, on the ground)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "outline": {
           "anyOf": [
             {
@@ -2288,6 +2304,17 @@
         },
         "item_overlap_px": {
           "$ref": "#/$defs/Num"
+        },
+        "extrude_opacity": {
+          "description": "the opacity of an overlay's 3D blocks (height_col); a look from before 2026-11-26 has none: MapLibre's own (1)",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Num"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "color": {
           "$ref": "#/$defs/Color"

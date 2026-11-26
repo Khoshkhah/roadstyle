@@ -130,6 +130,12 @@ fn the_64_looks_of_mapstyle() {
                 l.shift_remove("tile_keys");
             }
         }
+        // added on 2026-11-26: the opacity of an overlay's 3D blocks (rs.Overlay height_col)
+        for path in ["/config/overlays", "/theme/overlays"] {
+            if let Some(o) = got.pointer_mut(path).and_then(Value::as_object_mut) {
+                o.shift_remove("extrude_opacity");
+            }
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }

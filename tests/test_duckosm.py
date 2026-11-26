@@ -301,6 +301,33 @@ def test_the_buildings_3d_button_shows_and_hides_them(tmp_path):
         browser.close()
 
 
+
+@needs_db
+def test_the_pages_own_3d_blocks_hide_the_base_maps_3d_buildings(tmp_path):
+    """rs.Overlay(height_col=): the page's blocks (noise-map, 2026-11-26) replace the base map's 3D buildings while they show; hidden, the base
+    map's come back."""
+    pw = pytest.importorskip("playwright.sync_api")
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    import roadstyle as rs
+    from roadstyle import duckosm
+    blocks = gpd.GeoDataFrame({"h": [20.0]}, geometry=[box(7.42, 43.73, 7.421, 43.731)], crs=4326)
+    out = tmp_path / "blocks.html"
+    duckosm.page(DB, "all", overlays=[rs.Overlay(blocks, label="Blocks", height_col="h")]).save(str(out))
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        pg = browser.new_page()
+        pg.goto(out.as_uri())
+        pg.wait_for_selector("#rs-b3d-btn", timeout=120000)
+        shown = lambda: pg.evaluate("RS_OVERLAYS.filter(o => o.extrude).map(o => [!!o.base_map, map.getLayoutProperty(o.extrude, 'visibility')])")  # noqa: E731
+        pg.click("#rs-b3d-btn")
+        assert sorted(shown()) == [[False, "visible"], [True, "none"]]
+        pg.evaluate("rsSetOverlay('Blocks', false)")
+        pg.wait_for_timeout(100)
+        assert sorted(shown()) == [[False, "none"], [True, "visible"]]
+        browser.close()
+
 def test_a_building_tag_of_two_digits_gives_its_height(tmp_path):
     """Bug (E): a tag of the map `tags` is read with map_extract(tags, k)[1]. With tags[k][1], DuckDB 1.5 (and duckdb-wasm) give the
     first character: building:levels '25' was '2', so 7.32 m, not 25 x 3.66 = 91.5 m. Through the reader's SQL and the engine."""

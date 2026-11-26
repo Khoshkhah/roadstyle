@@ -451,6 +451,8 @@ fn overlay_entry(ov: &Overlay, i: usize, sid: &str, ids: &[String], base: Map<St
     }
     if crate::roads::yes(&ov.l["extrude"]) {    // its 3D layer (the dashboard's 3D button; a page's layers have no metadata)
         entry["extrude"] = ov_3d(i).into();
+    } else if u.is_some_and(|u| u.height_column.is_some()) {     // a caller's 3D buildings (height_col)
+        entry["extrude"] = crate::overlays::three_d_id(sid).into();
     }
     entry
 }

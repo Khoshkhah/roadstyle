@@ -26,6 +26,7 @@ palette.
 | `placement` | `"under"` the roads (for zones) or `"over"` them (for points). The default is `"over"`. |
 | `color`, `opacity`, `outline`, `radius`, `width` | one style for the whole layer. A colour is a text: `"#d32f2f"`, `"red"`, `"rgba(0,0,0,.5)"`. |
 | `color_col` | the property with a CSS colour for each feature. A feature with no value gets `color`. |
+| `height_col`, `base_col` | polygons in 3D: the property with each feature's height in metres, and the one with its base. See [Your own 3D buildings](#your-own-3d-buildings). |
 | `label` | the name of the layer in the **Layers** box |
 | `popup` | the fields that show when you click a feature. `None` shows all fields. `[]` makes the layer not clickable. |
 | `tooltip` | the fields that show under the pointer |
@@ -45,6 +46,29 @@ ground: an `"under"` overlay over it (a building, a zone) gets the hover and the
 layer is on top, and the click goes to the building that the pointer is on. The hover follows the same order.
 
 Overlays work only on the web backend (the default).
+
+## Your own 3D buildings
+
+Give `height_col=` to an overlay of polygons, and the overlay becomes the page's own 3D buildings. Use it when your page has its own
+heights, for example the blocks of a noise model: a building's outline and its parts, each part with its own height.
+
+```python
+blocks = gpd.read_parquet("blocks.parquet")          # polygons, any CRS
+rs.duckosm.page(db, layers=["buildings"], overlays=[
+    rs.Overlay(blocks, label="Blocks", height_col="HEIGHT_M", base_col="BASE_M", color="#c9b8a6", popup=["HEIGHT_M"]),
+]).save("page.html")
+```
+
+- `height_col` is the top of each block in metres above the ground. Each feature must have a number of 0 or more: a feature with no
+  height is an error, so that no block is drawn flat by mistake.
+- `base_col` is the bottom of a block in metres (a part on a roof). With no `base_col`, or a null value, the block starts on the ground.
+- The toolbox's buildings button shows the blocks in 3D. The flat footprints show at all times, as for a fill overlay.
+- While the blocks show, the 3D buildings of the base map and of a vector base map are not drawn. The base map's footprints and their
+  clicks stay. If you hide the blocks in the legend box, the base map's 3D buildings come back.
+- With the 3D terrain on, each block stands on the page's ground.
+- The *3D buildings opacity* slider and `buildings_opacity=` change the blocks too. Their start opacity is `overlays.extrude_opacity` of
+  the profile (0.9).
+- Not with `edge_col`: an overlay on the streets cannot be in 3D.
 
 ## Many hidden overlays: keep their data out of the page
 

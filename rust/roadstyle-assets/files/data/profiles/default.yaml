@@ -117,6 +117,7 @@ overlays:
   text_padding: 2
   text_halo_width: 1.5
   item_overlap_px: 1
+  extrude_opacity: 0.9        # the opacity of an overlay's 3D blocks (rs.Overlay height_col): the base map's 3D buildings have 0.9 too
 
 boundary: {width: 2.5, dash: [3, 2]}
 
